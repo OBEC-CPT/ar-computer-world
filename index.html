@@ -163,7 +163,7 @@
 
     .hidden { display: none !important; }
 
-    /* Fullscreen AR Screen (Independent from Main UI) */
+    /* Fullscreen AR View Container */
     #ar-screen {
       display: none;
       position: fixed;
@@ -183,6 +183,9 @@
       box-shadow: 0 4px 15px rgba(0,0,0,0.5);
     }
 
+    /* Force Hide VR Button from A-Frame */
+    .a-enter-vr { display: none !important; }
+
     @media (max-width: 768px) {
       .glass-container { padding: 10px; }
       .menu-grid { grid-template-columns: 1fr; }
@@ -193,7 +196,6 @@
 
   <canvas id="particle-bg"></canvas>
 
-  <!-- MAIN APPLICATION UI CONTAINER -->
   <div id="app" class="glass-container">
     <header class="app-header">
       <div class="logo"><i class="fa-solid fa-microchip"></i> AR IT WORLD</div>
@@ -294,7 +296,7 @@
     </main>
   </div>
 
-  <!-- SEPARATE AR SCREEN CONTAINER (OUTSIDE #APP) -->
+  <!-- SEPARATE AR SCREEN -->
   <div id="ar-screen">
     <button class="btn btn-danger ar-close-btn" onclick="closeAR()">
       <i class="fa-solid fa-xmark"></i> ปิดกล้อง
@@ -322,18 +324,20 @@
       if (viewId === 'dashboard-view') fetchDashboard();
     }
 
-    function openAR() {
-      // Hide standard UI elements completely to prevent container conflicts
+    async function openAR() {
+      // Release any lingering media hardware streams before launching
+      await releaseWebcam();
+
       document.getElementById('app').style.display = 'none';
       document.getElementById('particle-bg').style.display = 'none';
       
       const arScreen = document.getElementById('ar-screen');
       arScreen.style.display = 'block';
 
-      // Dynamically load clean AR.js scene in isolated viewport
+      // Load A-Frame scene with VR button explicitly disabled (vr-mode-ui="enabled: false")
       const holder = document.getElementById('ar-scene-holder');
       holder.innerHTML = `
-        <a-scene embedded arjs="sourceType: webcam; debugUIEnabled: false;">
+        <a-scene embedded arjs="sourceType: webcam; debugUIEnabled: false;" vr-mode-ui="enabled: false">
           <a-marker preset="hiro">
             <a-box position="0 0.5 0" material="color: #00f2fe; opacity: 0.8;" animation="property: rotation; to: 0 360 0; loop: true; dur: 4000"></a-box>
             <a-text value="CPU Central Processing Unit" position="0 1.2 0" align="center" color="#FFFFFF"></a-text>
@@ -343,24 +347,33 @@
       `;
     }
 
-    function closeAR() {
-      // Turn off webcam tracks cleanly
+    async function releaseWebcam() {
+      // Force kill all active browser camera tracks
+      if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+          stream.getTracks().forEach(track => track.stop());
+        } catch(e) {}
+      }
+      
       document.querySelectorAll('video').forEach(video => {
-        if (video.srcObject && video.srcObject.getTracks) {
+        if (video.srcObject) {
           video.srcObject.getTracks().forEach(track => track.stop());
+          video.srcObject = null;
         }
         video.remove();
       });
+    }
 
-      // Clear scene and hide AR screen
+    async function closeAR() {
+      await releaseWebcam();
+
       document.getElementById('ar-scene-holder').innerHTML = '';
       document.getElementById('ar-screen').style.display = 'none';
 
-      // Restore standard UI
       document.getElementById('app').style.display = 'block';
       document.getElementById('particle-bg').style.display = 'block';
 
-      // Remove unwanted inline body/html styles set by AR.js
       document.body.removeAttribute('style');
       document.documentElement.removeAttribute('style');
 
