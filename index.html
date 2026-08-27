@@ -63,10 +63,17 @@
     .brand-logo {
       display: flex; align-items: center; gap: 10px;
     }
+    
+    /* 4. เพิ่มแอนิเมชันโลโก้หมุนพลิก 3D */
+    @keyframes spin3D { 
+      0% { transform: perspective(400px) rotateY(0deg); }
+      100% { transform: perspective(400px) rotateY(360deg); } 
+    }
     .brand-logo img {
       height: 45px;
-      transform: scaleX(-1);
+      animation: spin3D 4s linear infinite;
     }
+
     .gradient-text {
       background: linear-gradient(90deg, #00f2fe, #4facfe, #00f2fe);
       background-size: 200% auto;
@@ -75,8 +82,11 @@
       font-weight: 600; font-size: 1.5rem;
       animation: shine 3s linear infinite;
     }
-
     @keyframes shine { to { background-position: 200% center; } }
+
+    #user-badge-bar {
+      display: flex; align-items: center; gap: 15px;
+    }
 
     /* Footer Styling */
     .app-footer {
@@ -152,7 +162,11 @@
         <span class="gradient-text">🤖 CPT AI Smart School</span>
       </div>
       <div id="user-badge-bar" class="hidden">
-        <span id="user-display-name">นักเรียน</span> | EXP: <span id="user-exp">0</span>
+        <div><span id="user-display-name">นักเรียน</span> | EXP: <span id="user-exp">0</span></div>
+        <!-- 5. เพิ่มปุ่มออกจากระบบ -->
+        <button class="btn btn-danger" style="padding: 6px 12px; font-size: 0.9rem;" onclick="logout()">
+          <i class="fa-solid fa-right-from-bracket"></i> ออก
+        </button>
       </div>
     </header>
 
@@ -231,6 +245,7 @@
 
     let currentUser = null; let currentView = 'login-view';
     let questionPool = []; 
+    let allAnswersList = []; // เพิ่มตัวแปรสำหรับเก็บทุกคำตอบจากทั้งคอลัมน์ B และ C
     let currentQuestion = null;
 
     // ตัวแปรเกม
@@ -267,6 +282,11 @@
         const res = await fetch(`${API_URL}?action=getQuestions`).then(r => r.json());
         if (res.status === 'success' && res.data.length > 0) {
           questionPool = res.data;
+          // 2. ดึงทุกคำตอบมาใส่ใน Pool อิสระ
+          questionPool.forEach(q => {
+            if (q.correct) allAnswersList.push(String(q.correct));
+            if (q.wrong) allAnswersList.push(String(q.wrong));
+          });
         }
       } catch (err) { console.error("ไม่สามารถดึงโจทย์ได้", err); }
     }
@@ -276,6 +296,16 @@
       document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
       document.getElementById(viewId).classList.add('active');
       if (viewId === 'leaderboard-view') fetchLeaderboard();
+    }
+
+    // ฟังก์ชันออกจากระบบ
+    function logout() {
+      currentUser = null;
+      document.getElementById('user-badge-bar').classList.add('hidden');
+      switchView('login-view');
+      Swal.fire({
+        toast: true, position: 'top-end', icon: 'success', title: 'ออกจากระบบสำเร็จ', showConfirmButton: false, timer: 1500
+      });
     }
 
     function onResults(results) {
@@ -401,9 +431,21 @@
       balloonSpawner = setInterval(() => {
         if (!gameActive) return;
         
-        const isCorrectBalloon = Math.random() > 0.5;
-        const bText = isCorrectBalloon ? currentQuestion.correct : currentQuestion.wrong;
-        const bScore = parseInt(currentQuestion.score) || 10;
+        // 2. ระบบสุ่มคำตอบอิสระ โอกาส 40% จะได้คำตอบที่ถูกของข้อปัจจุบัน ส่วนอีก 60% สุ่มจาก Pool ทั้งหมด
+        const isForceCorrect = Math.random() > 0.6; 
+        let bText = "";
+        let isCorrectBalloon = false;
+
+        if (isForceCorrect) {
+          bText = currentQuestion.correct;
+          isCorrectBalloon = true;
+        } else {
+          bText = allAnswersList[Math.floor(Math.random() * allAnswersList.length)];
+          // ตรวจสอบว่าคำตอบที่สุ่มได้บังเอิญตรงกับคำตอบที่ถูกหรือไม่
+          isCorrectBalloon = (bText === String(currentQuestion.correct));
+        }
+
+        const bScore = parseInt(currentQuestion.score) || 5;
         
         balloons.push({
           x: Math.random() * (1280 - 200) + 100, y: 720 + 60,
@@ -417,7 +459,7 @@
     function updateBalloons() {
       for (let i = balloons.length - 1; i >= 0; i--) {
         let b = balloons[i];
-        if (!b) continue; // ป้องกันข้อผิดพลาดกรณีอาร์เรย์ว่างเปล่า
+        if (!b) continue;
 
         b.y -= b.speed;
         
@@ -429,34 +471,30 @@
         let displayText = b.text.length > 15 ? b.text.substring(0, 15) + "..." : b.text;
         gameCtx.fillText(displayText, b.x, b.y + 8);
 
-        let isPopped = false;
-        let isCorrectHit = false;
+        let hitAction = false; // ตัวแปรสำหรับตรวจสอบการโดนตี (ไม่ว่าจะถูกหรือผิด)
 
         for (let hand of activeHands) {
           if (Math.hypot(hand.gameX - b.x, hand.gameY - b.y) < b.radius + 20) {
             if (b.isCorrect) {
+              // 3. คิดคะแนนบวกเต็มจำนวน
               gameScore += b.scoreVal; 
-              document.getElementById('score-text').innerText = gameScore;
-              isCorrectHit = true;
             } else {
-              gameScore -= Math.floor(b.scoreVal / 2);
-              document.getElementById('score-text').innerText = gameScore;
-              isPopped = true;
+              // 3. คิดคะแนนลบเต็มจำนวน (-5 เป็นต้น) ไม่มีการหาร 2
+              gameScore -= b.scoreVal; 
             }
+            document.getElementById('score-text').innerText = gameScore;
+            hitAction = true;
             break;
           }
         }
 
-        if (isCorrectHit) {
-          // หากตอบถูก ให้หยุดตัวเกิดลูกโป่ง เคลียร์อาร์เรย์ และหยุดลูปนี้ทันทีเพื่อป้องกัน Error
-          clearInterval(balloonSpawner);
-          clearInterval(gameTimerInterval);
-          balloons = [];
-          setTimeout(loadNextQuestion, 500);
-          break; // ตัดวงลูปการทำงานทันที
+        // 1. นำการหยุดเวลาและเปลี่ยนข้อออก ให้ลบลูกโป่งใบนั้นแล้วเล่นโจทย์เดิมต่อ
+        if (hitAction) {
+          balloons.splice(i, 1);
+          continue;
         }
 
-        if (isPopped || b.y < -b.radius) balloons.splice(i, 1);
+        if (b.y < -b.radius) balloons.splice(i, 1);
       }
     }
 
