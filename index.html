@@ -163,16 +163,16 @@
 
     .hidden { display: none !important; }
 
-    /* Fullscreen AR View Container */
+    /* ========================================= */
+    /* AR CAMERA SCREEN STYLES (UPDATED FIX)     */
+    /* ========================================= */
     #ar-screen {
       display: none;
       position: fixed;
-      top: 0;
-      left: 0;
-      width: 100vw;
-      height: 100vh;
+      top: 0; left: 0;
+      width: 100vw; height: 100vh;
       z-index: 999999;
-      background: #000;
+      background: transparent; /* แก้จอดำ: นำสีดำทึบออกให้โปร่งใส */
     }
 
     .ar-close-btn {
@@ -183,8 +183,19 @@
       box-shadow: 0 4px 15px rgba(0,0,0,0.5);
     }
 
-    /* Force Hide VR Button from A-Frame */
+    /* ซ่อนปุ่มแว่นตา VR ของ A-Frame */
     .a-enter-vr { display: none !important; }
+
+    /* โหมดเปิดกล้อง AR (ทำงานเมื่อเพิ่ม class 'ar-active' ที่ html/body) */
+    html.ar-active, body.ar-active {
+      background: transparent !important; /* บังคับโปร่งใส ไม่ให้ภาพพื้นหลังทับกล้อง */
+      overflow: hidden !important;
+    }
+    
+    html.ar-active #app, 
+    html.ar-active #particle-bg {
+      display: none !important; /* ซ่อนหน้า UI ปกติแบบสะอาดหมดจด */
+    }
 
     @media (max-width: 768px) {
       .glass-container { padding: 10px; }
@@ -324,17 +335,21 @@
       if (viewId === 'dashboard-view') fetchDashboard();
     }
 
+    // =========================================
+    // AR & CAMERA CONTROLS (UPDATED FIX)
+    // =========================================
+
     async function openAR() {
-      // Release any lingering media hardware streams before launching
       await releaseWebcam();
 
-      document.getElementById('app').style.display = 'none';
-      document.getElementById('particle-bg').style.display = 'none';
+      // สั่งเปลี่ยน HTML/Body เข้าโหมด AR (พื้นหลังโปร่งใส ซ่อนเมนู)
+      document.documentElement.classList.add('ar-active');
+      document.body.classList.add('ar-active');
       
       const arScreen = document.getElementById('ar-screen');
       arScreen.style.display = 'block';
 
-      // Load A-Frame scene with VR button explicitly disabled (vr-mode-ui="enabled: false")
+      // โหลดระบบ AR.js ลงไปในกล่อง
       const holder = document.getElementById('ar-scene-holder');
       holder.innerHTML = `
         <a-scene embedded arjs="sourceType: webcam; debugUIEnabled: false;" vr-mode-ui="enabled: false">
@@ -348,38 +363,38 @@
     }
 
     async function releaseWebcam() {
-      // Force kill all active browser camera tracks
-      if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-        try {
-          const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-          stream.getTracks().forEach(track => track.stop());
-        } catch(e) {}
-      }
-      
+      // ค้นหา <video> ทั้งหมดและสั่งตัดสัญญาณกล้อง
       document.querySelectorAll('video').forEach(video => {
-        if (video.srcObject) {
+        if (video.srcObject && video.srcObject.getTracks) {
           video.srcObject.getTracks().forEach(track => track.stop());
-          video.srcObject = null;
         }
         video.remove();
       });
     }
 
     async function closeAR() {
-      await releaseWebcam();
+      await releaseWebcam(); // สั่งปิดกล้อง
 
+      // ทำลายระบบ A-Frame
       document.getElementById('ar-scene-holder').innerHTML = '';
       document.getElementById('ar-screen').style.display = 'none';
 
-      document.getElementById('app').style.display = 'block';
-      document.getElementById('particle-bg').style.display = 'block';
+      // นำ class ar-active ออกเพื่อดึงเมนูกลับมา
+      document.documentElement.classList.remove('ar-active', 'a-fullscreen');
+      document.body.classList.remove('ar-active', 'a-fullscreen');
+      
+      // ล้างค่า CSS ขยะที่ AR.js แอบฝังไว้ (สาเหตุที่ทำให้เมนูรวน/หายไป)
+      document.documentElement.style.cssText = "";
+      document.body.style.cssText = "";
 
-      document.body.removeAttribute('style');
-      document.documentElement.removeAttribute('style');
-
+      // สั่งแสดงหน้าเมนูหลัก
       switchView('home-view');
       window.scrollTo(0, 0);
     }
+
+    // =========================================
+    // SYSTEM FUNCTIONS (LOGIN, GAMES, ETC.)
+    // =========================================
 
     async function executeLogin() {
       const name = document.getElementById('login-name').value;
