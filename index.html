@@ -159,11 +159,12 @@
       border-bottom: 1px solid var(--glass-border);
     }
 
+    /* ปรับปรุงให้ปุ่มปิดกล้องลอยเหนือวิดีโอเสมอ */
     .ar-overlay {
-      position: absolute;
+      position: fixed;
       top: 20px;
       left: 20px;
-      z-index: 999;
+      z-index: 99999;
     }
 
     .hidden { display: none !important; }
@@ -287,7 +288,6 @@
   </div>
 
   <script>
-    // *** นำ Web App URL ที่ได้จาก Google Apps Script มาวางตรงนี้ ***
     const API_URL = "https://script.google.com/macros/s/AKfycbwtBoPKE5fCsuv_ctxqybUjYed14PblkrBOp5vMm87ggNbnuGC0pj7BAscD86aPSTfuIQ/exec";
 
     let currentUser = null;
@@ -298,10 +298,29 @@
       initParticles();
     });
 
+    // ฟังก์ชันสั่งปิดกล้องและลบ Element วิดีโอทิ้งเมื่อออกจากหน้า AR
+    function stopARScene() {
+      const container = document.getElementById('ar-scene-container');
+      container.innerHTML = '';
+
+      const videoElements = document.querySelectorAll('video');
+      videoElements.forEach(video => {
+        if (video.srcObject && video.srcObject.getTracks) {
+          video.srcObject.getTracks().forEach(track => track.stop());
+        }
+        video.remove();
+      });
+      document.body.style.overflow = 'auto';
+    }
+
     function switchView(viewId) {
       document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
       const targetView = document.getElementById(viewId);
       if (targetView) targetView.classList.add('active');
+
+      if (viewId !== 'ar-view') {
+        stopARScene();
+      }
 
       if (viewId === 'ar-view') initARScene();
       if (viewId === 'leaderboard-view') fetchLeaderboard();
