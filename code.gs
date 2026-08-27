@@ -21,6 +21,8 @@ function doGet(e) {
       return buildJSONResponse({ status: 'success', data: getLeaderboardData() });
     } else if (action === 'getDashboard') {
       return buildJSONResponse({ status: 'success', data: getDashboardMetrics() });
+    } else if (action === 'getQuestions') {
+      return buildJSONResponse({ status: 'success', data: getQuestionsData() }); // ดึงข้อมูลโจทย์
     }
 
     return buildJSONResponse({ status: 'error', message: 'Invalid GET action' });
@@ -57,7 +59,8 @@ function initDatabase() {
     { name: 'Quiz', headers: ['ID', 'ModelID', 'Question', 'OptA', 'OptB', 'OptC', 'OptD', 'CorrectOpt', 'Explain'] },
     { name: 'Missions', headers: ['ID', 'Title', 'ReqType', 'ReqCount', 'RewardEXP', 'BadgeID'] },
     { name: 'Logs', headers: ['ID', 'Email', 'Action', 'Timestamp'] },
-    { name: 'Badges', headers: ['ID', 'Name', 'Icon', 'Description'] }
+    { name: 'Badges', headers: ['ID', 'Name', 'Icon', 'Description'] },
+    { name: 'DATA', headers: ['โจทย์', 'คำตอบถูก', 'คำตอบผิด', 'คะแนน', 'เวลา(วินาที)', 'ความเร็ว(ช้า/ปานกลาง/เร็ว)'] } // เพิ่มชีต DATA
   ];
 
   sheets.forEach(s => {
@@ -168,6 +171,33 @@ function getDashboardMetrics() {
       return acc;
     }, {})
   };
+}
+
+// ระบบดึงข้อมูลโจทย์จากชีต 'DATA'
+function getQuestionsData() {
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const sheet = ss.getSheetByName('DATA');
+  
+  if (!sheet) return []; // คืนค่าว่างถ้ายังไม่มีชีต
+  
+  const data = sheet.getDataRange().getValues();
+  let questions = [];
+  
+  // ลูปข้ามแถวแรก (แถวหัวข้อ)
+  for (let i = 1; i < data.length; i++) {
+    if (data[i][0] !== "") { // ตรวจสอบว่ามีโจทย์ ไม่ใช่บรรทัดว่าง
+      questions.push({
+        question: data[i][0],              // คอลัมน์ A (โจทย์)
+        correct: data[i][1],               // คอลัมน์ B (คำตอบถูก)
+        wrong: data[i][2],                 // คอลัมน์ C (คำตอบผิด)
+        score: data[i][3] || 10,           // คอลัมน์ D (คะแนน) - ค่าเร่ิมต้น 10
+        time: data[i][4] || 30,            // คอลัมน์ E (เวลาวินาที) - ค่าเริ่มต้น 30
+        speed: data[i][5] || "ปานกลาง"      // คอลัมน์ F (ความเร็ว) - ค่าเริ่มต้น ปานกลาง
+      });
+    }
+  }
+  
+  return questions;
 }
 
 // ---------------- UTILS & SECURITY ----------------
