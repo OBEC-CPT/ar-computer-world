@@ -8,7 +8,6 @@
   <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;600&display=swap" rel="stylesheet">
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
   
-  <!-- Libraries -->
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
@@ -30,15 +29,11 @@
       color: var(--text-color); overflow: hidden;
     }
 
-    #particle-bg {
+    #particle-bg, #global-hand-canvas {
       position: fixed; top: 0; left: 0; width: 100%; height: 100%;
       z-index: -1; pointer-events: none;
     }
-
-    #global-hand-canvas {
-      position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
-      z-index: 9999; pointer-events: none;
-    }
+    #global-hand-canvas { z-index: 9999; }
 
     .glass-container {
       max-width: 1200px; margin: 20px auto; padding: 20px;
@@ -52,7 +47,6 @@
       box-shadow: var(--glass-shadow); padding: 25px;
     }
 
-    /* Navbar & Logo Styling */
     .app-header {
       display: flex; justify-content: space-between; align-items: center;
       padding: 15px 25px; background: var(--glass-bg);
@@ -60,41 +54,29 @@
       margin-bottom: 25px; border: 1px solid var(--glass-border);
     }
     
-    .brand-logo {
-      display: flex; align-items: center; gap: 10px;
-    }
+    .brand-logo { display: flex; align-items: center; gap: 10px; }
     
-    /* 4. เพิ่มแอนิเมชันโลโก้หมุนพลิก 3D */
     @keyframes spin3D { 
       0% { transform: perspective(400px) rotateY(0deg); }
       100% { transform: perspective(400px) rotateY(360deg); } 
     }
-    .brand-logo img {
-      height: 45px;
-      animation: spin3D 4s linear infinite;
-    }
+    .brand-logo img { height: 45px; animation: spin3D 4s linear infinite; }
 
     .gradient-text {
       background: linear-gradient(90deg, #00f2fe, #4facfe, #00f2fe);
       background-size: 200% auto;
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      font-weight: 600; font-size: 1.5rem;
-      animation: shine 3s linear infinite;
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      font-weight: 600; font-size: 1.5rem; animation: shine 3s linear infinite;
     }
     @keyframes shine { to { background-position: 200% center; } }
 
-    #user-badge-bar {
-      display: flex; align-items: center; gap: 15px;
-    }
+    #user-badge-bar { display: flex; align-items: center; gap: 15px; }
 
-    /* Footer Styling */
     .app-footer {
       text-align: center; padding: 15px; margin-top: auto;
       border-radius: 15px; background: var(--glass-bg);
       backdrop-filter: blur(12px); border: 1px solid var(--glass-border);
     }
-    .app-footer span { font-size: 1rem; }
 
     .view { display: none; }
     .view.active { display: block; animation: fadeIn 0.4s ease; flex-grow: 1; }
@@ -163,7 +145,6 @@
       </div>
       <div id="user-badge-bar" class="hidden">
         <div><span id="user-display-name">นักเรียน</span> | EXP: <span id="user-exp">0</span></div>
-        <!-- 5. เพิ่มปุ่มออกจากระบบ -->
         <button class="btn btn-danger" style="padding: 6px 12px; font-size: 0.9rem;" onclick="logout()">
           <i class="fa-solid fa-right-from-bracket"></i> ออก
         </button>
@@ -171,7 +152,6 @@
     </header>
 
     <main style="flex-grow: 1; overflow-y: auto;">
-      <!-- 1. LOGIN VIEW -->
       <section id="login-view" class="view active">
         <div class="glass-card auth-card">
           <h2>เข้าสู่ระบบการเรียนรู้</h2>
@@ -187,7 +167,6 @@
         </div>
       </section>
 
-      <!-- 2. HOME MENU -->
       <section id="home-view" class="view">
         <div class="menu-grid">
           <div class="menu-card" onclick="openBalloonGame()">
@@ -203,7 +182,6 @@
         </div>
       </section>
 
-      <!-- 3. BALLOON GAME VIEW -->
       <section id="balloon-view" class="view">
         <div class="game-hud">
           <button class="btn btn-danger" onclick="stopGame()"><i class="fa-solid fa-xmark"></i> เลิกเล่น</button>
@@ -221,7 +199,6 @@
         </div>
       </section>
 
-      <!-- 4. LEADERBOARD -->
       <section id="leaderboard-view" class="view">
         <button class="btn btn-secondary" style="margin-bottom: 15px;" onclick="switchView('home-view')">กลับหน้าหลัก</button>
         <div class="glass-card">
@@ -234,7 +211,6 @@
       </section>
     </main>
 
-    <!-- Footer -->
     <footer class="app-footer">
       <span class="gradient-text">© 2026 🤖 CPT AI Smart School • All rights reserved.</span>
     </footer>
@@ -244,14 +220,13 @@
     const API_URL = "https://script.google.com/macros/s/AKfycbze9JXOJoeTI1_cg5sXjJ4pg7B86sczh6LAmeaDUNxd7Y86iFtleKlzEB2YeGph21ebkA/exec";
 
     let currentUser = null; let currentView = 'login-view';
-    let questionPool = []; 
-    let allAnswersList = []; // เพิ่มตัวแปรสำหรับเก็บทุกคำตอบจากทั้งคอลัมน์ B และ C
-    let currentQuestion = null;
-
-    // ตัวแปรเกม
+    let questionPool = []; let allAnswersList = []; let currentQuestion = null;
     let gameScore = 0; let gameTime = 30; let gameTimerInterval; let balloonSpawner;
     let gameActive = false; let balloons = []; let activeHands = [];
     
+    // 2. ตัวแปรสำหรับ Particle เอฟเฟกต์ลูกโป่งแตก
+    let popParticles = [];
+
     // ระบบคลิก
     let dwellTarget = null; let dwellStartTime = 0; const DWELL_DURATION = 800; let clickCooldown = 0;
 
@@ -259,18 +234,58 @@
     const gameCanvas = document.getElementById('output-canvas'); const gameCtx = gameCanvas.getContext('2d');
     const globalCanvas = document.getElementById('global-hand-canvas'); const globalCtx = globalCanvas.getContext('2d');
 
-    function resizeGlobalCanvas() {
-      globalCanvas.width = window.innerWidth; globalCanvas.height = window.innerHeight;
+    // 1. ระบบเสียง (Web Audio API)
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    function playSound(type) {
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+      const osc = audioCtx.createOscillator();
+      const gainNode = audioCtx.createGain();
+      osc.connect(gainNode); gainNode.connect(audioCtx.destination);
+      
+      if (type === 'correct') {
+        osc.type = 'sine'; // เสียงปิ๊งใสๆ
+        osc.frequency.setValueAtTime(880, audioCtx.currentTime); 
+        osc.frequency.exponentialRampToValueAtTime(1760, audioCtx.currentTime + 0.1);
+        gainNode.gain.setValueAtTime(0.3, audioCtx.currentTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
+        osc.start(); osc.stop(audioCtx.currentTime + 0.1);
+      } else if (type === 'wrong') {
+        osc.type = 'sawtooth'; // เสียงบัซเซอร์ต่ำๆ
+        osc.frequency.setValueAtTime(150, audioCtx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(100, audioCtx.currentTime + 0.2);
+        gainNode.gain.setValueAtTime(0.3, audioCtx.currentTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.2);
+        osc.start(); osc.stop(audioCtx.currentTime + 0.2);
+      } else if (type === 'end') {
+        osc.type = 'square'; // เสียงหมดเวลา
+        osc.frequency.setValueAtTime(440, audioCtx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(110, audioCtx.currentTime + 0.5);
+        gainNode.gain.setValueAtTime(0.3, audioCtx.currentTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.5);
+        osc.start(); osc.stop(audioCtx.currentTime + 0.5);
+      }
     }
+
+    // 2. ฟังก์ชันสร้าง Particle ตอนลูกโป่งแตก
+    function createPop(x, y, color) {
+      for (let i = 0; i < 15; i++) {
+        popParticles.push({
+          x: x, y: y,
+          vx: (Math.random() - 0.5) * 15, vy: (Math.random() - 0.5) * 15,
+          life: 1.0, color: color, size: Math.random() * 5 + 3
+        });
+      }
+    }
+
+    function resizeGlobalCanvas() { globalCanvas.width = window.innerWidth; globalCanvas.height = window.innerHeight; }
     window.addEventListener('resize', resizeGlobalCanvas); resizeGlobalCanvas();
 
+    // 3. ปรับจูนความแม่นยำ MediaPipe เป็น 0.75 เพื่อให้จับมือนิ่งขึ้นและลดอาการเป้าสั่น
     const hands = new Hands({ locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}` });
-    hands.setOptions({ maxNumHands: 2, modelComplexity: 1, minDetectionConfidence: 0.6, minTrackingConfidence: 0.6 });
+    hands.setOptions({ maxNumHands: 2, modelComplexity: 1, minDetectionConfidence: 0.75, minTrackingConfidence: 0.75 });
     hands.onResults(onResults);
 
-    document.addEventListener('DOMContentLoaded', () => {
-      initParticles(); initCamera(); fetchQuestions();
-    });
+    document.addEventListener('DOMContentLoaded', () => { initParticles(); initCamera(); fetchQuestions(); });
 
     async function initCamera() {
       const camera = new Camera(videoElement, { onFrame: async () => { await hands.send({ image: videoElement }); }, width: 1280, height: 720 });
@@ -282,7 +297,6 @@
         const res = await fetch(`${API_URL}?action=getQuestions`).then(r => r.json());
         if (res.status === 'success' && res.data.length > 0) {
           questionPool = res.data;
-          // 2. ดึงทุกคำตอบมาใส่ใน Pool อิสระ
           questionPool.forEach(q => {
             if (q.correct) allAnswersList.push(String(q.correct));
             if (q.wrong) allAnswersList.push(String(q.wrong));
@@ -298,14 +312,9 @@
       if (viewId === 'leaderboard-view') fetchLeaderboard();
     }
 
-    // ฟังก์ชันออกจากระบบ
     function logout() {
-      currentUser = null;
-      document.getElementById('user-badge-bar').classList.add('hidden');
-      switchView('login-view');
-      Swal.fire({
-        toast: true, position: 'top-end', icon: 'success', title: 'ออกจากระบบสำเร็จ', showConfirmButton: false, timer: 1500
-      });
+      currentUser = null; document.getElementById('user-badge-bar').classList.add('hidden');
+      switchView('login-view'); Swal.fire({ toast: true, position: 'top-end', icon: 'success', title: 'ออกจากระบบสำเร็จ', showConfirmButton: false, timer: 1500 });
     }
 
     function onResults(results) {
@@ -355,6 +364,7 @@
           progress = Math.min(1, (Date.now() - dwellStartTime) / DWELL_DURATION);
           if (progress >= 1) {
             clickableEl.click(); clickCooldown = Date.now() + 1000; resetDwell();
+            if (audioCtx.state === 'suspended') audioCtx.resume(); // ปลุกระบบเสียงเมื่อคลิก
           }
         } else { dwellTarget = clickableEl; dwellStartTime = Date.now(); }
       } else { resetDwell(); }
@@ -376,13 +386,13 @@
     }
 
     async function executeLogin() {
+      if (audioCtx.state === 'suspended') audioCtx.resume();
       const name = document.getElementById('login-name').value;
       if (!name) return Swal.fire('แจ้งเตือน', 'กรุณากรอกชื่อ', 'warning');
       Swal.showLoading();
       try {
         const res = await fetch(API_URL, {
-          method: 'POST',
-          body: JSON.stringify({ action: 'login', userData: { email: `${name.replace(/\s+/g, '')}@student.ac.th`, name: name } })
+          method: 'POST', body: JSON.stringify({ action: 'login', userData: { email: `${name.replace(/\s+/g, '')}@student.ac.th`, name: name } })
         }).then(r => r.json());
         Swal.close();
         if (res.status === 'success') {
@@ -396,12 +406,12 @@
     }
 
     function openBalloonGame() {
+      if (audioCtx.state === 'suspended') audioCtx.resume();
       if (questionPool.length === 0) {
-        Swal.fire('รอสักครู่', 'กำลังโหลดคำถามจากระบบ หรือไม่พบคำถามใน Google Sheet', 'info');
-        return;
+        Swal.fire('รอสักครู่', 'กำลังโหลดคำถามจากระบบ หรือไม่พบคำถามใน Google Sheet', 'info'); return;
       }
       switchView('balloon-view');
-      gameScore = 0; balloons = [];
+      gameScore = 0; balloons = []; popParticles = [];
       document.getElementById('score-text').innerText = gameScore;
       loadNextQuestion();
     }
@@ -413,35 +423,33 @@
       gameTime = parseInt(currentQuestion.time) || 30;
       document.getElementById('time-text').innerText = gameTime;
       
-      let speedBase = 3;
-      if (currentQuestion.speed === 'ช้า') speedBase = 2;
-      else if (currentQuestion.speed === 'เร็ว') speedBase = 6;
-      else speedBase = 4;
+      // 4. ระบบความเร็ว (คอลัมน์ F) - รองรับการกรอกตัวเลขโดยตรง หรือใช้ข้อความก็ได้
+      let speedBase = parseFloat(currentQuestion.speed);
+      if (isNaN(speedBase)) {
+        if (currentQuestion.speed === 'ช้า') speedBase = 5;
+        else if (currentQuestion.speed === 'เร็ว') speedBase = 12;
+        else if (currentQuestion.speed === 'เร็วมาก') speedBase = 16;
+        else speedBase = 8; // ปานกลาง (ตั้งค่าเริ่มต้นให้เร็วกว่าเดิม)
+      }
 
       gameActive = true;
-      clearInterval(gameTimerInterval);
-      clearInterval(balloonSpawner);
+      clearInterval(gameTimerInterval); clearInterval(balloonSpawner);
 
       gameTimerInterval = setInterval(() => {
-        gameTime--;
-        document.getElementById('time-text').innerText = gameTime;
+        gameTime--; document.getElementById('time-text').innerText = gameTime;
         if (gameTime <= 0) endGame();
       }, 1000);
 
       balloonSpawner = setInterval(() => {
         if (!gameActive) return;
         
-        // 2. ระบบสุ่มคำตอบอิสระ โอกาส 40% จะได้คำตอบที่ถูกของข้อปัจจุบัน ส่วนอีก 60% สุ่มจาก Pool ทั้งหมด
         const isForceCorrect = Math.random() > 0.6; 
-        let bText = "";
-        let isCorrectBalloon = false;
+        let bText = ""; let isCorrectBalloon = false;
 
         if (isForceCorrect) {
-          bText = currentQuestion.correct;
-          isCorrectBalloon = true;
+          bText = currentQuestion.correct; isCorrectBalloon = true;
         } else {
           bText = allAnswersList[Math.floor(Math.random() * allAnswersList.length)];
-          // ตรวจสอบว่าคำตอบที่สุ่มได้บังเอิญตรงกับคำตอบที่ถูกหรือไม่
           isCorrectBalloon = (bText === String(currentQuestion.correct));
         }
 
@@ -471,16 +479,19 @@
         let displayText = b.text.length > 15 ? b.text.substring(0, 15) + "..." : b.text;
         gameCtx.fillText(displayText, b.x, b.y + 8);
 
-        let hitAction = false; // ตัวแปรสำหรับตรวจสอบการโดนตี (ไม่ว่าจะถูกหรือผิด)
+        let hitAction = false;
 
         for (let hand of activeHands) {
+          // ระยะการชนปรับให้อิงจากรัศมี + 20 เพื่อให้ตีโดนง่ายขึ้นเมื่อความเร็วสูง
           if (Math.hypot(hand.gameX - b.x, hand.gameY - b.y) < b.radius + 20) {
+            createPop(b.x, b.y, b.color); // เรียกสร้างเอฟเฟกต์ระเบิด
+            
             if (b.isCorrect) {
-              // 3. คิดคะแนนบวกเต็มจำนวน
               gameScore += b.scoreVal; 
+              playSound('correct'); // เล่นเสียงตอบถูก
             } else {
-              // 3. คิดคะแนนลบเต็มจำนวน (-5 เป็นต้น) ไม่มีการหาร 2
               gameScore -= b.scoreVal; 
+              playSound('wrong'); // เล่นเสียงตอบผิด
             }
             document.getElementById('score-text').innerText = gameScore;
             hitAction = true;
@@ -488,24 +499,33 @@
           }
         }
 
-        // 1. นำการหยุดเวลาและเปลี่ยนข้อออก ให้ลบลูกโป่งใบนั้นแล้วเล่นโจทย์เดิมต่อ
-        if (hitAction) {
-          balloons.splice(i, 1);
-          continue;
-        }
-
+        if (hitAction) { balloons.splice(i, 1); continue; }
         if (b.y < -b.radius) balloons.splice(i, 1);
+      }
+
+      // วาด Particle เอฟเฟกต์เศษลูกโป่ง
+      for (let i = popParticles.length - 1; i >= 0; i--) {
+        let p = popParticles[i];
+        p.x += p.vx; p.y += p.vy; p.life -= 0.05; // ค่อยๆ จางลง
+        
+        if (p.life <= 0) { popParticles.splice(i, 1); continue; }
+        
+        gameCtx.globalAlpha = p.life;
+        gameCtx.beginPath(); gameCtx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+        gameCtx.fillStyle = p.color; gameCtx.fill();
+        gameCtx.globalAlpha = 1.0;
       }
     }
 
     async function endGame() {
       gameActive = false; clearInterval(gameTimerInterval); clearInterval(balloonSpawner);
+      playSound('end'); // เล่นเสียงหมดเวลา
+      
       Swal.fire({ title: 'หมดเวลา!', text: `คุณได้ ${gameScore} คะแนน กำลังบันทึกข้อมูล...`, allowOutsideClick: false });
       Swal.showLoading();
       try {
         const res = await fetch(API_URL, {
-          method: 'POST',
-          body: JSON.stringify({ action: 'addExp', email: currentUser.email, expGained: gameScore, activityName: 'Balloon Game (Hand)' })
+          method: 'POST', body: JSON.stringify({ action: 'addExp', email: currentUser.email, expGained: gameScore, activityName: 'Balloon Game (Hand)' })
         }).then(r => r.json());
         if(res.status === 'success') {
             currentUser.exp = res.data.exp;
@@ -515,9 +535,7 @@
       } catch (e) { Swal.fire('ข้อผิดพลาด', 'บันทึกคะแนนไม่สำเร็จ', 'error').then(() => switchView('home-view')); }
     }
 
-    function stopGame() {
-      gameActive = false; clearInterval(gameTimerInterval); clearInterval(balloonSpawner); switchView('home-view');
-    }
+    function stopGame() { gameActive = false; clearInterval(gameTimerInterval); clearInterval(balloonSpawner); switchView('home-view'); }
 
     async function fetchLeaderboard() {
       try {
