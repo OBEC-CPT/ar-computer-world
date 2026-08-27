@@ -65,7 +65,7 @@
     }
     .brand-logo img {
       height: 45px;
-      transform: scaleX(-1); /* พลิกรูปแนวนอน */
+      transform: scaleX(-1);
     }
     .gradient-text {
       background: linear-gradient(90deg, #00f2fe, #4facfe, #00f2fe);
@@ -227,7 +227,7 @@
   </div>
 
   <script>
-    const API_URL = "https://script.google.com/macros/s/AKfycbze9JXOJoeTI1_cg5sXjJ4pg7B86sczh6LAmeaDUNxd7Y86iFtleKlzEB2YeGph21ebkA/exec";
+    const API_URL = "https://script.google.com/macros/s/AKfycbz6wNQGCc6MO0VfWLQ7ObrLgbGbUXI5oLMb3f3-SN14YTOfKojKbVY4-05-AtLyYWd9og/exec";
 
     let currentUser = null; let currentView = 'login-view';
     let questionPool = []; 
@@ -262,13 +262,11 @@
       await camera.start();
     }
 
-    // ฟังก์ชันดึงโจทย์จาก Google Sheet
     async function fetchQuestions() {
       try {
         const res = await fetch(`${API_URL}?action=getQuestions`).then(r => r.json());
         if (res.status === 'success' && res.data.length > 0) {
           questionPool = res.data;
-          console.log("โหลดโจทย์เรียบร้อยแล้ว: ", questionPool.length, " ข้อ");
         }
       } catch (err) { console.error("ไม่สามารถดึงโจทย์ได้", err); }
     }
@@ -367,10 +365,9 @@
       } catch (err) { Swal.fire('Error', 'เชื่อมต่อเซิร์ฟเวอร์ไม่ได้', 'error'); }
     }
 
-    // --- ระบบเกมลูกโป่งปรับใหม่ดึงจาก Sheet ---
     function openBalloonGame() {
       if (questionPool.length === 0) {
-        Swal.fire('รอสักครู่', 'กำลังโหลดคำถามจากระบบ หรือไม่พบคำถาม', 'info');
+        Swal.fire('รอสักครู่', 'กำลังโหลดคำถามจากระบบ หรือไม่พบคำถามใน Google Sheet', 'info');
         return;
       }
       switchView('balloon-view');
@@ -380,21 +377,16 @@
     }
 
     function loadNextQuestion() {
-      if (!gameActive && gameScore > 0) return; // จบเกมแล้ว
-      
-      // สุ่มคำถามจาก Pool
       currentQuestion = questionPool[Math.floor(Math.random() * questionPool.length)];
       document.getElementById('game-status').innerText = `โจทย์: ${currentQuestion.question}`;
       
-      // ตั้งเวลาและคะแนนจาก Sheet
       gameTime = parseInt(currentQuestion.time) || 30;
       document.getElementById('time-text').innerText = gameTime;
       
-      // แปลงความเร็วจากข้อความ
       let speedBase = 3;
       if (currentQuestion.speed === 'ช้า') speedBase = 2;
       else if (currentQuestion.speed === 'เร็ว') speedBase = 6;
-      else speedBase = 4; // ปานกลาง
+      else speedBase = 4;
 
       gameActive = true;
       clearInterval(gameTimerInterval);
@@ -406,11 +398,9 @@
         if (gameTime <= 0) endGame();
       }, 1000);
 
-      // สร้างลูกโป่งคำตอบถูกและผิด ลอยขึ้นมา
       balloonSpawner = setInterval(() => {
         if (!gameActive) return;
         
-        // สุ่มว่าลูกนี้คือคำตอบถูกหรือผิด
         const isCorrectBalloon = Math.random() > 0.5;
         const bText = isCorrectBalloon ? currentQuestion.correct : currentQuestion.wrong;
         const bScore = parseInt(currentQuestion.score) || 10;
@@ -418,7 +408,7 @@
         balloons.push({
           x: Math.random() * (1280 - 200) + 100, y: 720 + 60,
           radius: 70, speed: (Math.random() * 2) + speedBase,
-          text: bText, isCorrect: isCorrectBalloon, scoreVal: bScore,
+          text: String(bText), isCorrect: isCorrectBalloon, scoreVal: bScore,
           color: isCorrectBalloon ? '#00c6ff' : '#ff4757'
         });
       }, 1500);
@@ -426,37 +416,46 @@
 
     function updateBalloons() {
       for (let i = balloons.length - 1; i >= 0; i--) {
-        let b = balloons[i]; b.y -= b.speed;
+        let b = balloons[i];
+        if (!b) continue; // ป้องกันข้อผิดพลาดกรณีอาร์เรย์ว่างเปล่า
+
+        b.y -= b.speed;
         
         gameCtx.beginPath(); gameCtx.arc(b.x, b.y, b.radius, 0, Math.PI * 2);
         gameCtx.fillStyle = b.color; gameCtx.fill();
         gameCtx.lineWidth = 3; gameCtx.strokeStyle = '#fff'; gameCtx.stroke();
         
         gameCtx.fillStyle = '#fff'; gameCtx.font = 'bold 22px Kanit'; gameCtx.textAlign = 'center';
-        // ตัดคำถ้ายาวไป
         let displayText = b.text.length > 15 ? b.text.substring(0, 15) + "..." : b.text;
         gameCtx.fillText(displayText, b.x, b.y + 8);
 
         let isPopped = false;
+        let isCorrectHit = false;
+
         for (let hand of activeHands) {
           if (Math.hypot(hand.gameX - b.x, hand.gameY - b.y) < b.radius + 20) {
             if (b.isCorrect) {
               gameScore += b.scoreVal; 
               document.getElementById('score-text').innerText = gameScore;
-              isPopped = true;
-              // ตอบถูก -> เปลี่ยนข้อใหม่ทันที
-              clearInterval(balloonSpawner);
-              clearInterval(gameTimerInterval);
-              balloons = [];
-              setTimeout(loadNextQuestion, 500);
+              isCorrectHit = true;
             } else {
-              gameScore -= Math.floor(b.scoreVal / 2); // ตอบผิดหักครึ่งคะแนน
+              gameScore -= Math.floor(b.scoreVal / 2);
               document.getElementById('score-text').innerText = gameScore;
               isPopped = true;
             }
             break;
           }
         }
+
+        if (isCorrectHit) {
+          // หากตอบถูก ให้หยุดตัวเกิดลูกโป่ง เคลียร์อาร์เรย์ และหยุดลูปนี้ทันทีเพื่อป้องกัน Error
+          clearInterval(balloonSpawner);
+          clearInterval(gameTimerInterval);
+          balloons = [];
+          setTimeout(loadNextQuestion, 500);
+          break; // ตัดวงลูปการทำงานทันที
+        }
+
         if (isPopped || b.y < -b.radius) balloons.splice(i, 1);
       }
     }
