@@ -2,147 +2,237 @@
 <html lang="th">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>IT Balloon Pop - เกมแตะลูกโป่งด้วยมือ (Hand Tracking)</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>AR Computer World - เกมลูกโป่ง IT</title>
   
-  <!-- Fonts & Icons -->
   <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;600&display=swap" rel="stylesheet">
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
   
-  <!-- MediaPipe Hand Tracking Libraries -->
+  <!-- Libraries -->
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  
+  <!-- MediaPipe Hand Tracking -->
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
-  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
   <style>
+    :root {
+      --primary-gradient: linear-gradient(135deg, #1e3c72 0%, #2a5298 50%, #681287 100%);
+      --glass-bg: rgba(255, 255, 255, 0.12);
+      --glass-border: rgba(255, 255, 255, 0.25);
+      --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+      --text-color: #ffffff;
+      --accent-color: #00f2fe;
+    }
+
     * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Kanit', sans-serif; }
+
+    html, body {
+      width: 100%; height: 100%;
+      background: var(--primary-gradient);
+      color: var(--text-color);
+      overflow-x: hidden;
+    }
+
+    #particle-bg {
+      position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+      z-index: -1; pointer-events: none;
+    }
+
+    .glass-container {
+      max-width: 1200px; margin: 20px auto; padding: 20px;
+      position: relative; z-index: 10;
+    }
+
+    .glass-card {
+      background: var(--glass-bg); backdrop-filter: blur(16px);
+      border-radius: 20px; border: 1px solid var(--glass-border);
+      box-shadow: var(--glass-shadow); padding: 25px;
+    }
+
+    .app-header {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 15px 25px; background: var(--glass-bg);
+      backdrop-filter: blur(12px); border-radius: 15px;
+      margin-bottom: 25px; border: 1px solid var(--glass-border);
+    }
+
+    .view { display: none; }
+    .view.active { display: block; animation: fadeIn 0.4s ease; }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .menu-grid {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 20px;
+    }
+
+    .menu-card {
+      background: var(--glass-bg); border: 1px solid var(--glass-border);
+      border-radius: 16px; padding: 25px; text-align: center;
+      cursor: pointer; transition: all 0.3s ease;
+    }
+
+    .menu-card:hover {
+      transform: translateY(-5px); background: rgba(255, 255, 255, 0.25);
+    }
+
+    .menu-card .icon { font-size: 2.5rem; margin-bottom: 15px; color: var(--accent-color); }
+
+    .auth-card { max-width: 450px; margin: 40px auto; text-align: center; }
     
-    body {
-      background: #0f172a;
-      color: #fff;
-      overflow: hidden;
-      width: 100vw;
-      height: 100vh;
-      display: flex;
-      justify-content: center;
-      align-items: center;
+    .form-group input, .form-row select, .form-row input {
+      width: 100%; padding: 12px; border-radius: 10px;
+      border: 1px solid var(--glass-border); background: rgba(255, 255, 255, 0.2);
+      color: var(--text-color); outline: none; margin-bottom: 15px;
     }
 
+    .btn {
+      padding: 12px 24px; border: none; border-radius: 12px;
+      font-weight: 600; cursor: pointer; transition: 0.2s; color: white;
+    }
+    .btn-primary { background: linear-gradient(90deg, #00c6ff, #0072ff); width: 100%; }
+    .btn-danger { background: #ff4757; }
+    .btn-secondary { background: rgba(255, 255, 255, 0.2); }
+
+    .hidden { display: none !important; }
+
+    /* Game UI */
     #game-container {
-      position: relative;
-      width: 1280px;
-      height: 720px;
-      max-width: 100vw;
-      max-height: 100vh;
-      background: #1e293b;
-      border-radius: 20px;
-      overflow: hidden;
-      box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+      position: relative; width: 100%; height: 60vh;
+      background: #000; border-radius: 15px; overflow: hidden;
     }
-
-    /* ซ่อน HTML Video ตัวจริงไว้ ใช้ canvas วาดแทน */
     #input-video { display: none; }
-
-    #output-canvas {
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
+    #output-canvas { width: 100%; height: 100%; object-fit: cover; }
+    
+    .game-hud {
+      display: flex; justify-content: space-between; align-items: center;
+      margin-bottom: 15px;
+    }
+    .score-badge {
+      background: rgba(0,0,0,0.5); padding: 10px 20px; border-radius: 10px;
+      border: 1px solid #00f2fe; color: #00f2fe; font-size: 1.2rem; font-weight: bold;
     }
 
-    /* แถบแดชบอร์ดแสดงคะแนน */
-    .hud {
-      position: absolute;
-      top: 20px;
-      left: 20px;
-      right: 20px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      z-index: 10;
-      pointer-events: none;
-    }
-
-    .score-board {
-      background: rgba(15, 23, 42, 0.85);
-      backdrop-filter: blur(10px);
-      padding: 12px 25px;
-      border-radius: 50px;
-      border: 2px solid #00f2fe;
-      font-size: 1.5rem;
-      font-weight: 600;
-      color: #00f2fe;
-      box-shadow: 0 0 20px rgba(0, 242, 254, 0.3);
-    }
-
-    .guide-box {
-      background: rgba(15, 23, 42, 0.85);
-      backdrop-filter: blur(10px);
-      padding: 10px 20px;
-      border-radius: 15px;
-      border: 1px solid rgba(255, 255, 255, 0.2);
-      color: #f1f5f9;
-      font-size: 1rem;
-    }
-
-    .btn-start {
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      padding: 20px 40px;
-      font-size: 1.8rem;
-      font-weight: 600;
-      color: #fff;
-      background: linear-gradient(135deg, #00c6ff, #0072ff);
-      border: none;
-      border-radius: 50px;
-      cursor: pointer;
-      z-index: 20;
-      box-shadow: 0 10px 30px rgba(0, 114, 255, 0.5);
-      transition: all 0.3s ease;
-    }
-
-    .btn-start:hover {
-      transform: translate(-50%, -50%) scale(1.05);
-      box-shadow: 0 15px 40px rgba(0, 242, 254, 0.8);
-    }
+    .data-table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+    .data-table th, .data-table td { padding: 12px; text-align: left; border-bottom: 1px solid var(--glass-border); }
   </style>
 </head>
 <body>
 
-  <div id="game-container">
-    <!-- แถบแสดงคะแนนและคำแนะนำ -->
-    <div class="hud">
-      <div class="score-board">
-        <i class="fa-solid fa-star" style="color:#ffd700;"></i> คะแนน: <span id="score-text">0</span>
-      </div>
-      <div class="guide-box">
-        <i class="fa-solid fa-hand-pointer" style="color:#00f2fe;"></i> ใช้นิ้วชี้จิ้มลูกโป่งคำถามที่<b>"ถูกต้อง"</b>
-      </div>
-    </div>
+  <canvas id="particle-bg"></canvas>
 
-    <button id="start-btn" class="btn-start" onclick="startGame()">
-      <i class="fa-solid fa-play"></i> เริ่มเล่นเกมแตะลูกโป่ง
-    </button>
+  <div id="app" class="glass-container">
+    <header class="app-header">
+      <div class="logo"><i class="fa-solid fa-microchip"></i> IT HAND TRACKING</div>
+      <div id="user-badge-bar" class="hidden">
+        <span id="user-display-name">นักเรียน</span> | EXP: <span id="user-exp">0</span>
+      </div>
+    </header>
 
-    <!-- กล้องเว็บแคมและ Canvas วาดผลลัพธ์ -->
-    <video id="input-video" playsinline></video>
-    <canvas id="output-canvas" width="1280" height="720"></canvas>
+    <main>
+      <!-- 1. LOGIN VIEW -->
+      <section id="login-view" class="view active">
+        <div class="glass-card auth-card">
+          <h2>เข้าสู่ระบบการเรียนรู้</h2>
+          <p style="margin-bottom: 20px;">โรงเรียนชลประทานผาแตก</p>
+          <input type="text" id="login-name" placeholder="ชื่อ-นามสกุล" required />
+          <div style="display:flex; gap:10px;">
+            <select id="login-class">
+              <option value="1">ม.1</option>
+              <option value="2">ม.2</option>
+              <option value="3">ม.3</option>
+            </select>
+            <input type="number" id="login-room" placeholder="ห้อง" min="1" max="10" />
+          </div>
+          <button class="btn btn-primary" onclick="executeLogin()">เข้าสู่ระบบ</button>
+        </div>
+      </section>
+
+      <!-- 2. HOME MENU -->
+      <section id="home-view" class="view">
+        <div class="menu-grid">
+          <div class="menu-card" onclick="openBalloonGame()">
+            <i class="fa-solid fa-hand-pointer icon"></i>
+            <h3>เกมลูกโป่ง IT (Hand Tracking)</h3>
+            <p>ใช้มือแตะลูกโป่งคำตอบให้ถูกต้อง</p>
+          </div>
+          <div class="menu-card" onclick="switchView('leaderboard-view')">
+            <i class="fa-solid fa-trophy icon"></i>
+            <h3>ตารางคะแนน</h3>
+            <p>อันดับผู้เล่นสูงสุด</p>
+          </div>
+          <div class="menu-card" onclick="switchView('dashboard-view')">
+            <i class="fa-solid fa-chart-line icon"></i>
+            <h3>Dashboard ครู</h3>
+            <p>วิเคราะห์สถิติข้อมูล</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- 3. BALLOON GAME VIEW -->
+      <section id="balloon-view" class="view">
+        <div class="game-hud">
+          <button class="btn btn-danger" onclick="stopGame()"><i class="fa-solid fa-xmark"></i> เลิกเล่น</button>
+          <div class="score-badge">
+            <i class="fa-regular fa-clock"></i> เวลา: <span id="time-text" style="color:#ff4757;">30</span> วิ | 
+            <i class="fa-solid fa-star" style="color:#ffd700;"></i> คะแนน: <span id="score-text">0</span>
+          </div>
+        </div>
+        <div class="glass-card" style="padding:10px; text-align:center;">
+          <h3 id="game-status">กำลังโหลดกล้อง... กรุณารอสักครู่</h3>
+          <div id="game-container">
+            <video id="input-video" playsinline></video>
+            <canvas id="output-canvas" width="1280" height="720"></canvas>
+          </div>
+        </div>
+      </section>
+
+      <!-- 4. LEADERBOARD -->
+      <section id="leaderboard-view" class="view">
+        <button class="btn btn-secondary" style="margin-bottom: 15px;" onclick="switchView('home-view')">กลับหน้าหลัก</button>
+        <div class="glass-card">
+          <h2><i class="fa-solid fa-ranking-star"></i> Top 100 Leaderboard</h2>
+          <table class="data-table" id="leaderboard-table">
+            <thead><tr><th>อันดับ</th><th>ชื่อ</th><th>EXP</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- 5. DASHBOARD -->
+      <section id="dashboard-view" class="view">
+        <button class="btn btn-secondary" style="margin-bottom: 15px;" onclick="switchView('home-view')">กลับหน้าหลัก</button>
+        <div class="glass-card">
+          <h4>จำนวนนักเรียน: <span id="metric-students">0</span> คน | เข้าเล่น: <span id="metric-plays">0</span> ครั้ง</h4>
+          <canvas id="chart-levels" height="100" style="margin-top:20px;"></canvas>
+        </div>
+      </section>
+
+    </main>
   </div>
 
   <script>
-    const videoElement = document.getElementById('input-video');
-    const canvasElement = document.getElementById('output-canvas');
-    const canvasCtx = canvasElement.getContext('2d');
-    const scoreText = document.getElementById('score-text');
-    const startBtn = document.getElementById('start-btn');
+    // ---------------------------------------------------------
+    // ใส่ API ของอาจารย์ตรงนี้ครับ (ตรวจสอบแล้วตรงกับที่ให้มา)
+    // ---------------------------------------------------------
+    const API_URL = "https://script.google.com/macros/s/AKfycbz6wNQGCc6MO0VfWLQ7ObrLgbGbUXI5oLMb3f3-SN14YTOfKojKbVY4-05-AtLyYWd9og/exec";
 
-    let score = 0;
+    let currentUser = null;
+    let chartInstance = null;
+
+    // ตัวแปรสำหรับเกม
+    let gameScore = 0;
+    let gameTime = 30;
+    let gameTimerInterval;
     let gameActive = false;
     let balloons = [];
     let handPoint = { x: 0, y: 0, visible: false };
+    let cameraInstance = null;
 
-    // คลังคำถามลูกโป่ง (ข้อความ, ความถูกต้อง true/false)
     const questionPool = [
       { text: "CPU: ประมวลผล", isCorrect: true },
       { text: "RAM: ความจำชั่วคราว", isCorrect: true },
@@ -150,155 +240,228 @@
       { text: "Monitor: หน่วยรับข้อมูล", isCorrect: false },
       { text: "GPU: ประมวลผลกราฟิก", isCorrect: true },
       { text: "Keyboard: หน่วยส่งออก", isCorrect: false },
-      { text: "SSD: บันทึกข้อมูล", isCorrect: true },
-      { text: "Printer: หน่วยรับเข้า", isCorrect: false }
+      { text: "SSD: บันทึกข้อมูล", isCorrect: true }
     ];
 
-    // ตั้งค่า MediaPipe Hands
-    const hands = new Hands({
-      locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
-    });
-
-    hands.setOptions({
-      maxNumHands: 1,
-      modelComplexity: 1,
-      minDetectionConfidence: 0.6,
-      minTrackingConfidence: 0.6
-    });
-
+    // MediaPipe Setup
+    const videoElement = document.getElementById('input-video');
+    const canvasElement = document.getElementById('output-canvas');
+    const canvasCtx = canvasElement.getContext('2d');
+    
+    const hands = new Hands({ locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}` });
+    hands.setOptions({ maxNumHands: 1, modelComplexity: 1, minDetectionConfidence: 0.6, minTrackingConfidence: 0.6 });
     hands.onResults(onResults);
 
-    // ระบบตรวจจับพิกัดนิ้วมือ
-    function onResults(results) {
-      // วาดภาพภาพจากกล้องแบบสลับซ้ายขวา (Mirror)
-      canvasCtx.save();
-      canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+    document.addEventListener('DOMContentLoaded', initParticles);
+
+    function switchView(viewId) {
+      document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+      document.getElementById(viewId).classList.add('active');
+      if (viewId === 'leaderboard-view') fetchLeaderboard();
+      if (viewId === 'dashboard-view') fetchDashboard();
+    }
+
+    async function executeLogin() {
+      const name = document.getElementById('login-name').value;
+      const room = document.getElementById('login-room').value;
+      if (!name || !room) return Swal.fire('แจ้งเตือน', 'กรุณากรอกข้อมูลให้ครบ', 'warning');
+
+      Swal.showLoading();
+      try {
+        const res = await fetch(API_URL, {
+          method: 'POST',
+          body: JSON.stringify({
+            action: 'login',
+            userData: { email: `${name.replace(/\s+/g, '')}@student.ac.th`, name: name, class: document.getElementById('login-class').value, room: room }
+          })
+        }).then(r => r.json());
+        
+        Swal.close();
+        if (res.status === 'success') {
+          currentUser = res.data;
+          document.getElementById('user-display-name').innerText = currentUser.name;
+          document.getElementById('user-exp').innerText = currentUser.exp;
+          document.getElementById('user-badge-bar').classList.remove('hidden');
+          switchView('home-view');
+        } else {
+          Swal.fire('Error', res.message, 'error');
+        }
+      } catch (err) { Swal.fire('Error', 'เชื่อมต่อเซิร์ฟเวอร์ไม่ได้', 'error'); }
+    }
+
+    // --- ระบบเกม Hand Tracking ---
+    async function openBalloonGame() {
+      switchView('balloon-view');
+      gameScore = 0; gameTime = 30; balloons = [];
+      document.getElementById('score-text').innerText = gameScore;
+      document.getElementById('time-text').innerText = gameTime;
+      document.getElementById('game-status').innerText = "กำลังเปิดกล้อง... นำมือมาบังหน้าจอเพื่อเริ่ม";
+      gameActive = true;
+
+      if (!cameraInstance) {
+        cameraInstance = new Camera(videoElement, {
+          onFrame: async () => { if (gameActive) await hands.send({ image: videoElement }); },
+          width: 1280, height: 720
+        });
+        await cameraInstance.start();
+      }
+
+      document.getElementById('game-status').innerText = "เริ่มเกมได้! (แตะคำตอบที่ถูก)";
       
-      canvasCtx.translate(canvasElement.width, 0);
+      // ตัวนับเวลา
+      gameTimerInterval = setInterval(() => {
+        gameTime--;
+        document.getElementById('time-text').innerText = gameTime;
+        if (gameTime <= 0) endGame();
+      }, 1000);
+
+      // สร้างลูกโป่ง
+      setInterval(() => {
+        if (!gameActive) return;
+        const q = questionPool[Math.floor(Math.random() * questionPool.length)];
+        balloons.push({
+          x: Math.random() * (1280 - 200) + 100, y: 720 + 60,
+          radius: 65, speed: Math.random() * 3 + 3,
+          text: q.text, isCorrect: q.isCorrect,
+          color: q.isCorrect ? '#00c6ff' : '#ff4757'
+        });
+      }, 1200);
+    }
+
+    function onResults(results) {
+      if (!gameActive) return;
+      canvasCtx.save();
+      canvasCtx.clearRect(0, 0, 1280, 720);
+      canvasCtx.translate(1280, 0);
       canvasCtx.scale(-1, 1);
-      canvasCtx.drawImage(results.image, 0, 0, canvasElement.width, canvasElement.height);
+      canvasCtx.drawImage(results.image, 0, 0, 1280, 720);
 
       if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
-        const landmarks = results.multiHandLandmarks[0];
-        // ตำแหน่ง 8 คือ ปลายนิ้วชี้ (Index Finger Tip)
-        const indexTip = landmarks[8];
-
-        handPoint.x = (1 - indexTip.x) * canvasElement.width; // ปรับพิกัดตามการ Mirror
-        handPoint.y = indexTip.y * canvasElement.height;
+        const indexTip = results.multiHandLandmarks[0][8];
+        handPoint.x = (1 - indexTip.x) * 1280;
+        handPoint.y = indexTip.y * 720;
         handPoint.visible = true;
 
-        // วาดจุดเล็งเป้าหมายที่ปลายนิ้วชี้
         canvasCtx.restore();
-        drawFingerTarget(handPoint.x, handPoint.y);
+        canvasCtx.beginPath();
+        canvasCtx.arc(handPoint.x, handPoint.y, 15, 0, 2 * Math.PI);
+        canvasCtx.fillStyle = '#ff0055'; canvasCtx.fill();
+        canvasCtx.lineWidth = 4; canvasCtx.strokeStyle = '#fff'; canvasCtx.stroke();
       } else {
-        handPoint.visible = false;
-        canvasCtx.restore();
+        handPoint.visible = false; canvasCtx.restore();
       }
 
-      if (gameActive) {
-        updateAndDrawBalloons();
-      }
+      updateBalloons();
     }
 
-    // วาดวงกลมเป้าหมายตามนิ้วชี้
-    function drawFingerTarget(x, y) {
-      canvasCtx.beginPath();
-      canvasCtx.arc(x, y, 15, 0, 2 * Math.PI);
-      canvasCtx.fillStyle = '#ff0055';
-      canvasCtx.fill();
-      canvasCtx.lineWidth = 4;
-      canvasCtx.strokeStyle = '#ffffff';
-      canvasCtx.stroke();
-    }
-
-    // สร้างลูกโป่งใหม่
-    function spawnBalloon() {
-      if (!gameActive) return;
-      const q = questionPool[Math.floor(Math.random() * questionPool.length)];
-      balloons.push({
-        x: Math.random() * (canvasElement.width - 200) + 100,
-        y: canvasElement.height + 60,
-        radius: 65,
-        speed: Math.random() * 2 + 2,
-        text: q.text,
-        isCorrect: q.isCorrect,
-        color: q.isCorrect ? '#00c6ff' : '#ff4757'
-      });
-    }
-
-    // อัปเดตตำแหน่งลูกโป่งและตรวจเช็กการชนกับนิ้วมือ
-    function updateAndDrawBalloons() {
+    function updateBalloons() {
       for (let i = balloons.length - 1; i >= 0; i--) {
         let b = balloons[i];
-        b.y -= b.speed; // ลูกโป่งลอยขึ้นด้านบน
-
-        // วาดตัวลูกโป่ง
+        b.y -= b.speed;
+        
         canvasCtx.beginPath();
         canvasCtx.arc(b.x, b.y, b.radius, 0, Math.PI * 2);
-        canvasCtx.fillStyle = b.color;
-        canvasCtx.globalAlpha = 0.85;
-        canvasCtx.fill();
-        canvasCtx.lineWidth = 3;
-        canvasCtx.strokeStyle = '#ffffff';
-        canvasCtx.stroke();
-        canvasCtx.globalAlpha = 1.0;
-
-        // วาดข้อความคำถามในลูกโป่ง
-        canvasCtx.fillStyle = '#ffffff';
-        canvasCtx.font = 'bold 18px Kanit';
+        canvasCtx.fillStyle = b.color; canvasCtx.fill();
+        canvasCtx.lineWidth = 3; canvasCtx.strokeStyle = '#fff'; canvasCtx.stroke();
+        
+        canvasCtx.fillStyle = '#fff';
+        canvasCtx.font = 'bold 20px Kanit';
         canvasCtx.textAlign = 'center';
         canvasCtx.fillText(b.text, b.x, b.y + 6);
 
-        // เช็กว่านิ้วชี้เอื้อมมาแตะลูกโป่งหรือไม่ (Collision Detection)
         if (handPoint.visible) {
           let dist = Math.hypot(handPoint.x - b.x, handPoint.y - b.y);
-          if (dist < b.radius + 15) { // แตะถูกลูกโป่ง
-            if (b.isCorrect) {
-              score += 10;
-              showPopEffect(b.x, b.y, "+10", "#2ed573");
-            } else {
-              score = Math.max(0, score - 5);
-              showPopEffect(b.x, b.y, "-5", "#ff4757");
-            }
-            scoreText.innerText = score;
+          if (dist < b.radius + 15) {
+            gameScore += b.isCorrect ? 10 : -5;
+            document.getElementById('score-text').innerText = gameScore;
             balloons.splice(i, 1);
             continue;
           }
         }
-
-        // ลบลูกโป่งออกเมื่อลอยเลยขอบบน
-        if (b.y < -b.radius) {
-          balloons.splice(i, 1);
-        }
+        if (b.y < -b.radius) balloons.splice(i, 1);
       }
     }
 
-    // แสดง Effect ข้อความเมื่อลูกโป่งแตก
-    function showPopEffect(x, y, text, color) {
-      canvasCtx.fillStyle = color;
-      canvasCtx.font = 'bold 35px Kanit';
-      canvasCtx.fillText(text, x, y);
+    async function endGame() {
+      gameActive = false;
+      clearInterval(gameTimerInterval);
+      
+      Swal.fire({ title: 'หมดเวลา!', text: `คุณได้ ${gameScore} คะแนน กำลังบันทึกข้อมูล...`, allowOutsideClick: false });
+      Swal.showLoading();
+
+      try {
+        const res = await fetch(API_URL, {
+          method: 'POST',
+          body: JSON.stringify({
+            action: 'addExp',
+            email: currentUser.email,
+            expGained: gameScore,
+            activityName: 'Balloon Game (Hand)'
+          })
+        }).then(r => r.json());
+
+        if(res.status === 'success') {
+            currentUser.exp = res.data.exp;
+            document.getElementById('user-exp').innerText = currentUser.exp;
+            Swal.fire('บันทึกสำเร็จ!', `EXP รวมของคุณคือ ${currentUser.exp}`, 'success').then(() => {
+                switchView('home-view');
+            });
+        }
+      } catch (e) {
+        Swal.fire('ข้อผิดพลาด', 'บันทึกคะแนนไม่สำเร็จ', 'error').then(() => switchView('home-view'));
+      }
     }
 
-    // เริ่มต้นระบบกล้องและเกม
-    async function startGame() {
-      startBtn.style.display = 'none';
-      score = 0;
-      scoreText.innerText = score;
-      gameActive = true;
+    function stopGame() {
+      gameActive = false;
+      clearInterval(gameTimerInterval);
+      switchView('home-view');
+    }
 
-      const camera = new Camera(videoElement, {
-        onFrame: async () => {
-          await hands.send({ image: videoElement });
-        },
-        width: 1280,
-        height: 720
-      });
+    // API ดึงข้อมูล
+    async function fetchLeaderboard() {
+      try {
+        const res = await fetch(`${API_URL}?action=getLeaderboard`).then(r => r.json());
+        if (res.status === 'success') {
+          const tbody = document.querySelector('#leaderboard-table tbody');
+          tbody.innerHTML = '';
+          res.data.forEach((row, idx) => {
+            tbody.innerHTML += `<tr><td>${idx + 1}</td><td>${row.name}</td><td>${row.exp}</td></tr>`;
+          });
+        }
+      } catch (err) {}
+    }
 
-      await camera.start();
-      
-      // ให้ลูกโป่งทยอยลอยขึ้นมาทุกๆ 1.5 วินาที
-      setInterval(spawnBalloon, 1500);
+    async function fetchDashboard() {
+      try {
+        const res = await fetch(`${API_URL}?action=getDashboard`).then(r => r.json());
+        if (res.status === 'success') {
+          document.getElementById('metric-students').innerText = res.data.totalStudents;
+          document.getElementById('metric-plays').innerText = res.data.totalPlays;
+        }
+      } catch (err) {}
+    }
+
+    // พื้นหลัง
+    function initParticles() {
+      const canvas = document.getElementById('particle-bg');
+      const ctx = canvas.getContext('2d');
+      canvas.width = window.innerWidth; canvas.height = window.innerHeight;
+      let particles = Array.from({ length: 40 }, () => ({
+        x: Math.random() * canvas.width, y: Math.random() * canvas.height,
+        r: Math.random() * 3 + 1, dx: (Math.random()-0.5)*1.5, dy: (Math.random()-0.5)*1.5
+      }));
+      function animate() {
+        requestAnimationFrame(animate);
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+        particles.forEach(p => {
+          p.x += p.dx; p.y += p.dy;
+          if (p.x < 0 || p.x > canvas.width) p.dx *= -1;
+          if (p.y < 0 || p.y > canvas.height) p.dy *= -1;
+          ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2); ctx.fill();
+        });
+      } animate();
     }
   </script>
 </body>
