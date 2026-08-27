@@ -216,13 +216,9 @@
   </div>
 
   <script>
-    // ---------------------------------------------------------
-    // ใส่ API ของอาจารย์ตรงนี้ครับ (ตรวจสอบแล้วตรงกับที่ให้มา)
-    // ---------------------------------------------------------
     const API_URL = "https://script.google.com/macros/s/AKfycbz6wNQGCc6MO0VfWLQ7ObrLgbGbUXI5oLMb3f3-SN14YTOfKojKbVY4-05-AtLyYWd9og/exec";
 
     let currentUser = null;
-    let chartInstance = null;
 
     // ตัวแปรสำหรับเกม
     let gameScore = 0;
@@ -230,7 +226,9 @@
     let gameTimerInterval;
     let gameActive = false;
     let balloons = [];
-    let handPoint = { x: 0, y: 0, visible: false };
+    
+    // เปลี่ยนจากจับมือเดียว (handPoint) เป็นเก็บข้อมูลมือหลายๆ ข้าง (activeHands)
+    let activeHands = []; 
     let cameraInstance = null;
 
     const questionPool = [
@@ -249,7 +247,11 @@
     const canvasCtx = canvasElement.getContext('2d');
     
     const hands = new Hands({ locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}` });
-    hands.setOptions({ maxNumHands: 1, modelComplexity: 1, minDetectionConfidence: 0.6, minTrackingConfidence: 0.6 });
+    
+    // ----------------------------------------------------
+    // แก้ไข: maxNumHands เป็น 2 เพื่อให้ตรวจจับได้ 2 มือพร้อมกัน
+    // ----------------------------------------------------
+    hands.setOptions({ maxNumHands: 2, modelComplexity: 1, minDetectionConfidence: 0.6, minTrackingConfidence: 0.6 });
     hands.onResults(onResults);
 
     document.addEventListener('DOMContentLoaded', initParticles);
@@ -332,23 +334,35 @@
       if (!gameActive) return;
       canvasCtx.save();
       canvasCtx.clearRect(0, 0, 1280, 720);
+      
+      // วาดวิดีโอแบบกลับซ้าย-ขวา
       canvasCtx.translate(1280, 0);
       canvasCtx.scale(-1, 1);
       canvasCtx.drawImage(results.image, 0, 0, 1280, 720);
+      canvasCtx.restore(); // คืนค่าแกน X ให้เป็นปกติ เพื่อวาดจุดเล็งและลูกโป่ง
 
+      activeHands = []; // รีเซ็ตตำแหน่งมือในแต่ละเฟรม
+
+      // ดึงข้อมูลพิกัดมือที่ตรวจจับได้ (อาจจะมี 1 หรือ 2 มือ)
       if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
-        const indexTip = results.multiHandLandmarks[0][8];
-        handPoint.x = (1 - indexTip.x) * 1280;
-        handPoint.y = indexTip.y * 720;
-        handPoint.visible = true;
+        for (let i = 0; i < results.multiHandLandmarks.length; i++) {
+          const indexTip = results.multiHandLandmarks[i][8]; // จุดที่ 8 คือปลายนิ้วชี้
+          
+          // คำนวณพิกัดให้ตรงกับวิดีโอที่โดนกลับซ้ายขวา
+          const hx = (1 - indexTip.x) * 1280;
+          const hy = indexTip.y * 720;
+          
+          activeHands.push({ x: hx, y: hy });
 
-        canvasCtx.restore();
-        canvasCtx.beginPath();
-        canvasCtx.arc(handPoint.x, handPoint.y, 15, 0, 2 * Math.PI);
-        canvasCtx.fillStyle = '#ff0055'; canvasCtx.fill();
-        canvasCtx.lineWidth = 4; canvasCtx.strokeStyle = '#fff'; canvasCtx.stroke();
-      } else {
-        handPoint.visible = false; canvasCtx.restore();
+          // วาดจุดเล็งเป้าสีแดงที่ปลายนิ้วชี้แต่ละข้าง
+          canvasCtx.beginPath();
+          canvasCtx.arc(hx, hy, 15, 0, 2 * Math.PI);
+          canvasCtx.fillStyle = '#ff0055'; 
+          canvasCtx.fill();
+          canvasCtx.lineWidth = 4; 
+          canvasCtx.strokeStyle = '#fff'; 
+          canvasCtx.stroke();
+        }
       }
 
       updateBalloons();
@@ -359,25 +373,39 @@
         let b = balloons[i];
         b.y -= b.speed;
         
+        // วาดตัวลูกโป่ง
         canvasCtx.beginPath();
         canvasCtx.arc(b.x, b.y, b.radius, 0, Math.PI * 2);
-        canvasCtx.fillStyle = b.color; canvasCtx.fill();
-        canvasCtx.lineWidth = 3; canvasCtx.strokeStyle = '#fff'; canvasCtx.stroke();
+        canvasCtx.fillStyle = b.color; 
+        canvasCtx.fill();
+        canvasCtx.lineWidth = 3; 
+        canvasCtx.strokeStyle = '#fff'; 
+        canvasCtx.stroke();
         
+        // วาดข้อความ
         canvasCtx.fillStyle = '#fff';
         canvasCtx.font = 'bold 20px Kanit';
         canvasCtx.textAlign = 'center';
         canvasCtx.fillText(b.text, b.x, b.y + 6);
 
-        if (handPoint.visible) {
-          let dist = Math.hypot(handPoint.x - b.x, handPoint.y - b.y);
+        // เช็กการชนกับ "ทุกมือ" ที่ระบบจับได้ (1 หรือ 2 มือ)
+        let isPopped = false;
+        for (let hand of activeHands) {
+          let dist = Math.hypot(hand.x - b.x, hand.y - b.y);
           if (dist < b.radius + 15) {
             gameScore += b.isCorrect ? 10 : -5;
             document.getElementById('score-text').innerText = gameScore;
-            balloons.splice(i, 1);
-            continue;
+            isPopped = true;
+            break; // ถ้าแตะโดนแล้ว ให้หยุดเช็กมือข้างที่เหลือกับลูกโป่งใบนี้
           }
         }
+
+        if (isPopped) {
+          balloons.splice(i, 1);
+          continue;
+        }
+
+        // ลบลูกโป่งถ้าลอยเลยขอบจอ
         if (b.y < -b.radius) balloons.splice(i, 1);
       }
     }
