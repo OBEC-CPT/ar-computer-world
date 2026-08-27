@@ -1,0 +1,516 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>AR Computer World - โรงเรียนชลประทานผาแตก</title>
+  
+  <!-- Fonts & Libraries -->
+  <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;600&display=swap" rel="stylesheet">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+  <script src="https://aframe.io/releases/1.3.0/aframe.min.js"></script>
+  <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <style>
+    :root {
+      --primary-gradient: linear-gradient(135deg, #1e3c72 0%, #2a5298 50%, #681287 100%);
+      --glass-bg: rgba(255, 255, 255, 0.12);
+      --glass-border: rgba(255, 255, 255, 0.25);
+      --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+      --text-color: #ffffff;
+      --accent-color: #00f2fe;
+    }
+
+    body.light-theme {
+      --primary-gradient: linear-gradient(135deg, #e0c3fc 0%, #8ec5fc 100%);
+      --glass-bg: rgba(255, 255, 255, 0.55);
+      --glass-border: rgba(255, 255, 255, 0.4);
+      --text-color: #1a1a2e;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Kanit', sans-serif; }
+
+    body {
+      background: var(--primary-gradient);
+      min-height: 100vh;
+      color: var(--text-color);
+      overflow-x: hidden;
+    }
+
+    #particle-bg {
+      position: fixed;
+      top: 0; left: 0; width: 100%; height: 100%;
+      z-index: -1; pointer-events: none;
+    }
+
+    .glass-container {
+      max-width: 1200px;
+      margin: 20px auto;
+      padding: 20px;
+    }
+
+    .glass-card {
+      background: var(--glass-bg);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border-radius: 20px;
+      border: 1px solid var(--glass-border);
+      box-shadow: var(--glass-shadow);
+      padding: 25px;
+    }
+
+    .app-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 15px 25px;
+      background: var(--glass-bg);
+      backdrop-filter: blur(12px);
+      border-radius: 15px;
+      margin-bottom: 25px;
+      border: 1px solid var(--glass-border);
+    }
+
+    .view { display: none; }
+    .view.active { display: block; animation: fadeIn 0.4s ease-in-out; }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .menu-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 20px;
+    }
+
+    .menu-card {
+      background: var(--glass-bg);
+      border: 1px solid var(--glass-border);
+      border-radius: 16px;
+      padding: 25px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+
+    .menu-card:hover {
+      transform: translateY(-5px);
+      background: rgba(255, 255, 255, 0.25);
+      box-shadow: 0 12px 40px rgba(0, 242, 254, 0.3);
+    }
+
+    .menu-card .icon {
+      font-size: 2.5rem;
+      margin-bottom: 15px;
+      color: var(--accent-color);
+    }
+
+    .auth-card {
+      max-width: 450px;
+      margin: 40px auto;
+      text-align: center;
+    }
+
+    .form-group { margin-bottom: 15px; }
+
+    .form-group input, .form-row input, .form-row select {
+      width: 100%;
+      padding: 12px;
+      border-radius: 10px;
+      border: 1px solid var(--glass-border);
+      background: rgba(255, 255, 255, 0.2);
+      color: var(--text-color);
+      outline: none;
+    }
+
+    .form-row {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+
+    .btn {
+      padding: 12px 24px;
+      border: none;
+      border-radius: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: 0.2s;
+    }
+
+    .btn-primary { background: linear-gradient(90deg, #00c6ff, #0072ff); color: white; }
+    .btn-secondary { background: rgba(255, 255, 255, 0.2); color: white; }
+    .btn-danger { background: #ff4757; color: white; }
+    .btn-block { width: 100%; }
+
+    .data-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 15px;
+    }
+
+    .data-table th, .data-table td {
+      padding: 12px 15px;
+      text-align: left;
+      border-bottom: 1px solid var(--glass-border);
+    }
+
+    .ar-overlay {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      z-index: 999;
+    }
+
+    .hidden { display: none !important; }
+
+    @media (max-width: 768px) {
+      .glass-container { padding: 10px; }
+      .menu-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body class="dark-theme">
+
+  <canvas id="particle-bg"></canvas>
+
+  <div id="app" class="glass-container">
+    <header class="app-header">
+      <div class="logo"><i class="fa-solid fa-microchip"></i> AR IT WORLD</div>
+      <div id="user-badge-bar" class="user-badge-bar hidden">
+        <span id="user-display-name">นักเรียน</span>
+        <span id="user-level-tag" class="level-tag">LV1</span>
+      </div>
+      <div class="theme-toggle" onclick="toggleTheme()" style="cursor: pointer;">
+        <i class="fa-solid fa-moon" id="theme-icon"></i>
+      </div>
+    </header>
+
+    <main class="view-content">
+
+      <!-- 1. LOGIN VIEW -->
+      <section id="login-view" class="view active">
+        <div class="glass-card auth-card">
+          <h2><i class="fa-solid fa-laptop-code"></i> เข้าสู่ระบบการเรียนรู้</h2>
+          <p class="subtitle" style="margin-bottom: 20px;">โรงเรียนชลประทานผาแตก (ปัญญาพลอุปถัมภ์)</p>
+          <div class="form-group">
+            <input type="text" id="login-name" placeholder="ชื่อ-นามสกุล" required />
+          </div>
+          <div class="form-row">
+            <select id="login-class">
+              <option value="1">มัธยมศึกษาปีที่ 1</option>
+              <option value="2">มัธยมศึกษาปีที่ 2</option>
+              <option value="3">มัธยมศึกษาปีที่ 3</option>
+            </select>
+            <input type="number" id="login-room" placeholder="ห้อง (เช่น 1)" min="1" max="10" />
+          </div>
+          <button class="btn btn-primary btn-block" onclick="executeLogin()">
+            <i class="fa-solid fa-right-to-bracket"></i> เริ่มต้นใช้งาน
+          </button>
+        </div>
+      </section>
+
+      <!-- 2. HOME MENU VIEW -->
+      <section id="home-view" class="view">
+        <div class="menu-grid">
+          <div class="menu-card" onclick="switchView('ar-view')">
+            <i class="fa-solid fa-camera-rotate icon"></i>
+            <h3>สแกน AR Hardware</h3>
+            <p>สแกน Marker สำรวจอุปกรณ์ 3D</p>
+          </div>
+          <div class="menu-card" onclick="switchView('minigame-view')">
+            <i class="fa-solid fa-gamepad icon"></i>
+            <h3>มินิเกมและภารกิจ</h3>
+            <p>ประกอบคอมพิวเตอร์ & จับคู่</p>
+          </div>
+          <div class="menu-card" onclick="switchView('leaderboard-view')">
+            <i class="fa-solid fa-trophy icon"></i>
+            <h3>ตารางคะแนน</h3>
+            <p>Top 100 Realtime Leaderboard</p>
+          </div>
+          <div class="menu-card" onclick="switchView('dashboard-view')">
+            <i class="fa-solid fa-chart-line icon"></i>
+            <h3>Dashboard ครู</h3>
+            <p>วิเคราะห์สถิติและการตอบคำถาม</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- 3. AR CAMERA VIEW -->
+      <section id="ar-view" class="view">
+        <div class="ar-overlay">
+          <button class="btn btn-danger btn-sm" onclick="switchView('home-view')"><i class="fa-solid fa-xmark"></i> ปิดกล้อง</button>
+        </div>
+        <div id="ar-scene-container"></div>
+      </section>
+
+      <!-- 4. MINI GAMES VIEW -->
+      <section id="minigame-view" class="view">
+        <button class="btn btn-secondary" style="margin-bottom: 15px;" onclick="switchView('home-view')"><i class="fa-solid fa-arrow-left"></i> กลับหน้าหลัก</button>
+        <div class="game-selector">
+          <button class="btn btn-primary" onclick="loadMiniGame('boot')">เรียงลำดับ Boot Sequence</button>
+        </div>
+        <div id="game-stage" class="glass-card" style="margin-top: 15px;"></div>
+      </section>
+
+      <!-- 5. LEADERBOARD VIEW -->
+      <section id="leaderboard-view" class="view">
+        <button class="btn btn-secondary" style="margin-bottom: 15px;" onclick="switchView('home-view')"><i class="fa-solid fa-arrow-left"></i> กลับหน้าหลัก</button>
+        <div class="glass-card">
+          <h2><i class="fa-solid fa-ranking-star"></i> อันดับผู้เล่นสูงสุด (Top 100)</h2>
+          <table class="data-table" id="leaderboard-table">
+            <thead>
+              <tr><th>อันดับ</th><th>ชื่อ-นามสกุล</th><th>ระดับ</th><th>EXP</th></tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- 6. DASHBOARD VIEW -->
+      <section id="dashboard-view" class="view">
+        <button class="btn btn-secondary" style="margin-bottom: 15px;" onclick="switchView('home-view')"><i class="fa-solid fa-arrow-left"></i> กลับหน้าหลัก</button>
+        <div class="glass-card" style="margin-bottom: 15px;">
+          <h4>จำนวนนักเรียนในระบบ: <span id="metric-students">0</span> คน</h4>
+          <h4>จำนวนการเข้าร่วมกิจกรรม: <span id="metric-plays">0</span> ครั้ง</h4>
+        </div>
+        <div class="glass-card">
+          <canvas id="chart-levels" height="150"></canvas>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <script>
+    // *** นำ Web App URL ที่ได้จาก Google Apps Script มาวางตรงนี้ ***
+    const API_URL = "https://script.google.com/macros/s/AKfycbwtBoPKE5fCsuv_ctxqybUjYed14PblkrBOp5vMm87ggNbnuGC0pj7BAscD86aPSTfuIQ/exec";
+
+    let currentUser = null;
+    let chartInstance = null;
+    let currentStep = 1;
+
+    document.addEventListener('DOMContentLoaded', () => {
+      initParticles();
+    });
+
+    function switchView(viewId) {
+      document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+      const targetView = document.getElementById(viewId);
+      if (targetView) targetView.classList.add('active');
+
+      if (viewId === 'ar-view') initARScene();
+      if (viewId === 'leaderboard-view') fetchLeaderboard();
+      if (viewId === 'dashboard-view') fetchDashboard();
+    }
+
+    async function executeLogin() {
+      const name = document.getElementById('login-name').value;
+      const studentClass = document.getElementById('login-class').value;
+      const room = document.getElementById('login-room').value;
+
+      if (!name || !room) {
+        Swal.fire('กรุณากรอกข้อมูล', 'โปรดระบุชื่อและห้องเรียนให้ครบถ้วน', 'warning');
+        return;
+      }
+
+      Swal.showLoading();
+      const payload = {
+        action: 'login',
+        userData: {
+          email: `${name.toLowerCase().replace(/\s+/g, '')}@student.ac.th`,
+          name: name,
+          class: studentClass,
+          room: room
+        }
+      };
+
+      try {
+        const response = await fetch(API_URL, {
+          method: 'POST',
+          body: JSON.stringify(payload)
+        });
+        const res = await response.json();
+        Swal.close();
+
+        if (res.status === 'success') {
+          currentUser = res.data;
+          document.getElementById('user-display-name').innerText = currentUser.name;
+          document.getElementById('user-level-tag').innerText = currentUser.level;
+          document.getElementById('user-badge-bar').classList.remove('hidden');
+          switchView('home-view');
+          Swal.fire('ยินดีต้อนรับ!', `สวัสดี ${currentUser.name} เข้าสู่โลกเทคโนโลยี`, 'success');
+        } else {
+          Swal.fire('เกิดข้อผิดพลาด', res.message || 'ไม่สามารถเข้าสู่ระบบได้', 'error');
+        }
+      } catch (err) {
+        Swal.close();
+        Swal.fire('Error', 'ไม่สามารถเชื่อมต่อเครื่องเซิร์ฟเวอร์ได้', 'error');
+        console.error(err);
+      }
+    }
+
+    function initARScene() {
+      const container = document.getElementById('ar-scene-container');
+      container.innerHTML = `
+        <a-scene embedded arjs="sourceType: webcam; debugUIEnabled: false;">
+          <a-marker preset="hiro">
+            <a-box position="0 0.5 0" material="color: #00f2fe; opacity: 0.8;" animation="property: rotation; to: 0 360 0; loop: true; dur: 4000">
+            </a-box>
+            <a-text value="CPU Central Processing Unit" position="-1 1.2 0" color="#FFFFFF"></a-text>
+          </a-marker>
+          <a-entity camera></a-entity>
+        </a-scene>
+      `;
+    }
+
+    function loadMiniGame(type) {
+      const stage = document.getElementById('game-stage');
+      if (type === 'boot') {
+        stage.innerHTML = `
+          <h3><i class="fa-solid fa-list-ol"></i> เรียงลำดับขั้นตอนการ Boot คอมพิวเตอร์</h3>
+          <p style="margin-bottom:15px;">คลิกตามลำดับขั้นตอนที่ถูกต้อง</p>
+          <div id="sortable-list">
+            <button class="btn btn-secondary btn-block" style="margin-bottom:10px;" onclick="checkBootStep(this, 1)">1. Power On (เปิดสวิตช์ไฟ)</button>
+            <button class="btn btn-secondary btn-block" style="margin-bottom:10px;" onclick="checkBootStep(this, 2)">2. POST (ตรวจสอบฮาร์ดแวร์)</button>
+            <button class="btn btn-secondary btn-block" style="margin-bottom:10px;" onclick="checkBootStep(this, 3)">3. Load BIOS / UEFI</button>
+            <button class="btn btn-secondary btn-block" style="margin-bottom:10px;" onclick="checkBootStep(this, 4)">4. Load Operating System (OS)</button>
+            <button class="btn btn-secondary btn-block" style="margin-bottom:10px;" onclick="checkBootStep(this, 5)">5. Desktop Ready (พร้อมใช้งาน)</button>
+          </div>
+        `;
+      }
+    }
+
+    async function checkBootStep(el, step) {
+      if (step === currentStep) {
+        el.style.background = '#2ed573';
+        currentStep++;
+        if (currentStep > 5) {
+          Swal.fire('สำเร็จ!', 'คุณเรียงลำดับขั้นตอน Boot เครื่องถูกต้อง +50 EXP', 'success');
+          await addEXP(50, 'MiniGame: Boot Sequence');
+          currentStep = 1;
+        }
+      } else {
+        el.style.background = '#ff4757';
+        Swal.fire('ผิดพลาด', 'ลำดับไม่ถูกต้อง กรุณาลองใหม่อีกครั้ง', 'error');
+        currentStep = 1;
+      }
+    }
+
+    async function addEXP(expGained, activityName) {
+      if (!currentUser) return;
+      try {
+        const response = await fetch(API_URL, {
+          method: 'POST',
+          body: JSON.stringify({
+            action: 'addExp',
+            email: currentUser.email,
+            expGained: expGained,
+            activityName: activityName
+          })
+        });
+        const res = await response.json();
+        if (res.status === 'success') {
+          currentUser.exp = res.data.exp;
+          currentUser.level = res.data.level;
+          document.getElementById('user-level-tag').innerText = currentUser.level;
+        }
+      } catch (err) {
+        console.error("Add EXP Error:", err);
+      }
+    }
+
+    async function fetchLeaderboard() {
+      try {
+        const response = await fetch(`${API_URL}?action=getLeaderboard`);
+        const res = await response.json();
+        if (res.status === 'success') {
+          const tbody = document.querySelector('#leaderboard-table tbody');
+          tbody.innerHTML = '';
+          res.data.forEach((row, idx) => {
+            tbody.innerHTML += `
+              <tr>
+                <td>${idx + 1}</td>
+                <td>${row.name} (${row.class})</td>
+                <td>${row.level}</td>
+                <td>${row.exp} EXP</td>
+              </tr>
+            `;
+          });
+        }
+      } catch (err) {
+        console.error("Leaderboard Error:", err);
+      }
+    }
+
+    async function fetchDashboard() {
+      try {
+        const response = await fetch(`${API_URL}?action=getDashboard`);
+        const res = await response.json();
+        if (res.status === 'success') {
+          const data = res.data;
+          document.getElementById('metric-students').innerText = data.totalStudents;
+          document.getElementById('metric-plays').innerText = data.totalPlays;
+
+          const ctx = document.getElementById('chart-levels').getContext('2d');
+          if (chartInstance) chartInstance.destroy();
+          
+          chartInstance = new Chart(ctx, {
+            type: 'bar',
+            data: {
+              labels: Object.keys(data.levelDistribution),
+              datasets: [{
+                label: 'จำนวนนักเรียนจำแนกตาม Level',
+                data: Object.values(data.levelDistribution),
+                backgroundColor: '#00f2fe'
+              }]
+            },
+            options: { responsive: true, plugins: { legend: { labels: { color: 'white' } } } }
+          });
+        }
+      } catch (err) {
+        console.error("Dashboard Error:", err);
+      }
+    }
+
+    function toggleTheme() {
+      document.body.classList.toggle('light-theme');
+    }
+
+    function initParticles() {
+      const canvas = document.getElementById('particle-bg');
+      const ctx = canvas.getContext('2d');
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+
+      let particles = Array.from({ length: 40 }, () => ({
+        x: Math.random() * canvas.width,
+        y: Math.random() * canvas.height,
+        radius: Math.random() * 3 + 1,
+        dx: (Math.random() - 0.5) * 1.5,
+        dy: (Math.random() - 0.5) * 1.5
+      }));
+
+      function animate() {
+        requestAnimationFrame(animate);
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+        
+        particles.forEach(p => {
+          p.x += p.dx; p.y += p.dy;
+          if (p.x < 0 || p.x > canvas.width) p.dx *= -1;
+          if (p.y < 0 || p.y > canvas.height) p.dy *= -1;
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+          ctx.fill();
+        });
+      }
+      animate();
+    }
+  </script>
+</body>
+</html>
