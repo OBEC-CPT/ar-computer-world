@@ -10,7 +10,6 @@
   
   <!-- Libraries -->
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   
   <!-- MediaPipe Hand Tracking -->
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
@@ -32,12 +31,20 @@
       width: 100%; height: 100%;
       background: var(--primary-gradient);
       color: var(--text-color);
-      overflow-x: hidden;
+      overflow: hidden;
     }
 
     #particle-bg {
       position: fixed; top: 0; left: 0; width: 100%; height: 100%;
       z-index: -1; pointer-events: none;
+    }
+
+    /* Overlay Canvas สำหรับวาดจุดเล็งนิ้วมือครอบทั้งหน้าจอ UI */
+    #global-hand-canvas {
+      position: fixed; top: 0; left: 0;
+      width: 100vw; height: 100vh;
+      z-index: 9999;
+      pointer-events: none; /* เพื่อให้คลิกทะลุไปหาปุ่ม HTML ได้ */
     }
 
     .glass-container {
@@ -76,23 +83,32 @@
       cursor: pointer; transition: all 0.3s ease;
     }
 
-    .menu-card:hover {
-      transform: translateY(-5px); background: rgba(255, 255, 255, 0.25);
+    .menu-card:hover, .menu-card.hand-hover {
+      transform: translateY(-5px) scale(1.02);
+      background: rgba(0, 242, 254, 0.25);
+      border-color: #00f2fe;
+      box-shadow: 0 0 20px rgba(0, 242, 254, 0.4);
     }
 
     .menu-card .icon { font-size: 2.5rem; margin-bottom: 15px; color: var(--accent-color); }
 
     .auth-card { max-width: 450px; margin: 40px auto; text-align: center; }
     
-    .form-group input, .form-row select, .form-row input {
+    .form-group input, .form-row select, .form-row input, select, input {
       width: 100%; padding: 12px; border-radius: 10px;
       border: 1px solid var(--glass-border); background: rgba(255, 255, 255, 0.2);
-      color: var(--text-color); outline: none; margin-bottom: 15px;
+      color: var(--text-color); outline: none; margin-bottom: 15px; font-size: 1rem;
     }
+    select option { background: #1e293b; color: #fff; }
 
     .btn {
       padding: 12px 24px; border: none; border-radius: 12px;
       font-weight: 600; cursor: pointer; transition: 0.2s; color: white;
+      font-size: 1rem;
+    }
+    .btn:hover, .btn.hand-hover {
+      transform: scale(1.05);
+      box-shadow: 0 0 15px rgba(255, 255, 255, 0.5);
     }
     .btn-primary { background: linear-gradient(90deg, #00c6ff, #0072ff); width: 100%; }
     .btn-danger { background: #ff4757; }
@@ -100,7 +116,7 @@
 
     .hidden { display: none !important; }
 
-    /* Game UI */
+    /* Game UI Container */
     #game-container {
       position: relative; width: 100%; height: 60vh;
       background: #000; border-radius: 15px; overflow: hidden;
@@ -119,15 +135,30 @@
 
     .data-table { width: 100%; border-collapse: collapse; margin-top: 15px; }
     .data-table th, .data-table td { padding: 12px; text-align: left; border-bottom: 1px solid var(--glass-border); }
+
+    /* คำแนะนำการใช้นิ้วมือ */
+    .hand-guide-bar {
+      position: fixed; bottom: 15px; left: 50%; transform: translateX(-50%);
+      background: rgba(15, 23, 42, 0.85); backdrop-filter: blur(10px);
+      padding: 8px 20px; border-radius: 30px; border: 1px solid rgba(0, 242, 254, 0.4);
+      font-size: 0.9rem; color: #00f2fe; z-index: 999; text-align: center;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+    }
   </style>
 </head>
 <body>
 
   <canvas id="particle-bg"></canvas>
+  <!-- Global Canvas สำหรับแสดงจุดเล็งนิ้วทับทุกหน้าจอ -->
+  <canvas id="global-hand-canvas"></canvas>
+
+  <div class="hand-guide-bar">
+    <i class="fa-solid fa-hand-pointer"></i> ยื่นนิ้วชี้เพื่อเลื่อนเป้า | <b>ค้างไว้ 0.8 วินาที</b> เพื่อกดเลือกเมนู
+  </div>
 
   <div id="app" class="glass-container">
     <header class="app-header">
-      <div class="logo"><i class="fa-solid fa-microchip"></i> IT HAND TRACKING</div>
+      <div class="logo"><i class="fa-solid fa-microchip"></i> IT HAND TRACKING KIOSK</div>
       <div id="user-badge-bar" class="hidden">
         <span id="user-display-name">นักเรียน</span> | EXP: <span id="user-exp">0</span>
       </div>
@@ -139,14 +170,14 @@
         <div class="glass-card auth-card">
           <h2>เข้าสู่ระบบการเรียนรู้</h2>
           <p style="margin-bottom: 20px;">โรงเรียนชลประทานผาแตก</p>
-          <input type="text" id="login-name" placeholder="ชื่อ-นามสกุล" required />
+          <input type="text" id="login-name" placeholder="พิมพ์ชื่อ-นามสกุล" required />
           <div style="display:flex; gap:10px;">
             <select id="login-class">
               <option value="1">ม.1</option>
               <option value="2">ม.2</option>
               <option value="3">ม.3</option>
             </select>
-            <input type="number" id="login-room" placeholder="ห้อง" min="1" max="10" />
+            <input type="number" id="login-room" placeholder="ห้อง" min="1" max="10" value="1" />
           </div>
           <button class="btn btn-primary" onclick="executeLogin()">เข้าสู่ระบบ</button>
         </div>
@@ -157,8 +188,8 @@
         <div class="menu-grid">
           <div class="menu-card" onclick="openBalloonGame()">
             <i class="fa-solid fa-hand-pointer icon"></i>
-            <h3>เกมลูกโป่ง IT (Hand Tracking)</h3>
-            <p>ใช้มือแตะลูกโป่งคำตอบให้ถูกต้อง</p>
+            <h3>เกมลูกโป่ง IT</h3>
+            <p>ใช้นิ้วมือไล่แตะลูกโป่งคำตอบ</p>
           </div>
           <div class="menu-card" onclick="switchView('leaderboard-view')">
             <i class="fa-solid fa-trophy icon"></i>
@@ -183,7 +214,7 @@
           </div>
         </div>
         <div class="glass-card" style="padding:10px; text-align:center;">
-          <h3 id="game-status">กำลังโหลดกล้อง... กรุณารอสักครู่</h3>
+          <h3 id="game-status">กำลังเริ่มต้นเกม...</h3>
           <div id="game-container">
             <video id="input-video" playsinline></video>
             <canvas id="output-canvas" width="1280" height="720"></canvas>
@@ -208,7 +239,6 @@
         <button class="btn btn-secondary" style="margin-bottom: 15px;" onclick="switchView('home-view')">กลับหน้าหลัก</button>
         <div class="glass-card">
           <h4>จำนวนนักเรียน: <span id="metric-students">0</span> คน | เข้าเล่น: <span id="metric-plays">0</span> ครั้ง</h4>
-          <canvas id="chart-levels" height="100" style="margin-top:20px;"></canvas>
         </div>
       </section>
 
@@ -216,9 +246,10 @@
   </div>
 
   <script>
-    const API_URL = "https://script.google.com/macros/s/AKfycbz6wNQGCc6MO0VfWLQ7ObrLgbGbUXI5oLMb3f3-SN14YTOfKojKbVY4-05-AtLyYWd9og/exec";
+    const API_URL = "https://script.google.com/macros/s/AKfycby5ujK4IaX9I3RRoculx6RSXAg5HuzClW8aIkqxWSs3uLILRWb2fWqKpsI3kS43BC8hBg/exec";
 
     let currentUser = null;
+    let currentView = 'login-view';
 
     // ตัวแปรสำหรับเกม
     let gameScore = 0;
@@ -226,10 +257,13 @@
     let gameTimerInterval;
     let gameActive = false;
     let balloons = [];
+    let activeHands = [];
     
-    // เปลี่ยนจากจับมือเดียว (handPoint) เป็นเก็บข้อมูลมือหลายๆ ข้าง (activeHands)
-    let activeHands = []; 
-    let cameraInstance = null;
+    // ระบบ Dwell Click (ถือค้างเพื่อคลิก)
+    let dwellTarget = null;
+    let dwellStartTime = 0;
+    const DWELL_DURATION = 800; // 0.8 วินาที
+    let clickCooldown = 0;
 
     const questionPool = [
       { text: "CPU: ประมวลผล", isCorrect: true },
@@ -241,32 +275,164 @@
       { text: "SSD: บันทึกข้อมูล", isCorrect: true }
     ];
 
-    // MediaPipe Setup
+    // MediaPipe & Global Canvas Elements
     const videoElement = document.getElementById('input-video');
-    const canvasElement = document.getElementById('output-canvas');
-    const canvasCtx = canvasElement.getContext('2d');
+    const gameCanvas = document.getElementById('output-canvas');
+    const gameCtx = gameCanvas.getContext('2d');
     
+    const globalCanvas = document.getElementById('global-hand-canvas');
+    const globalCtx = globalCanvas.getContext('2d');
+
+    function resizeGlobalCanvas() {
+      globalCanvas.width = window.innerWidth;
+      globalCanvas.height = window.innerHeight;
+    }
+    window.addEventListener('resize', resizeGlobalCanvas);
+    resizeGlobalCanvas();
+
+    // ตั้งค่า MediaPipe Hands
     const hands = new Hands({ locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}` });
-    
-    // ----------------------------------------------------
-    // แก้ไข: maxNumHands เป็น 2 เพื่อให้ตรวจจับได้ 2 มือพร้อมกัน
-    // ----------------------------------------------------
     hands.setOptions({ maxNumHands: 2, modelComplexity: 1, minDetectionConfidence: 0.6, minTrackingConfidence: 0.6 });
     hands.onResults(onResults);
 
-    document.addEventListener('DOMContentLoaded', initParticles);
+    // เปิดใช้งานกล้องทันทีตั้งแต่โหลดหน้าเว็บ
+    document.addEventListener('DOMContentLoaded', () => {
+      initParticles();
+      initCamera();
+    });
+
+    async function initCamera() {
+      const camera = new Camera(videoElement, {
+        onFrame: async () => { await hands.send({ image: videoElement }); },
+        width: 1280, height: 720
+      });
+      await camera.start();
+    }
 
     function switchView(viewId) {
+      currentView = viewId;
       document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
       document.getElementById(viewId).classList.add('active');
       if (viewId === 'leaderboard-view') fetchLeaderboard();
       if (viewId === 'dashboard-view') fetchDashboard();
     }
 
+    // --- ระบบประมวลผลนิ้วมือ และ UI Touch ---
+    function onResults(results) {
+      globalCtx.clearRect(0, 0, globalCanvas.width, globalCanvas.height);
+      activeHands = [];
+
+      // ดึงพิกัดมือที่ตรวจจับได้
+      if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+        for (let i = 0; i < results.multiHandLandmarks.length; i++) {
+          const indexTip = results.multiHandLandmarks[i][8]; // ปลายนิ้วชี้
+          
+          // แปลงพิกัดเป็นขนาดหน้าจอจริง (Screen Coordinates)
+          const screenX = (1 - indexTip.x) * globalCanvas.width;
+          const screenY = indexTip.y * globalCanvas.height;
+
+          // พิกัดบน Canvas สำหรับเกม
+          const gameX = (1 - indexTip.x) * 1280;
+          const gameY = indexTip.y * 720;
+
+          activeHands.push({ screenX, screenY, gameX, gameY });
+        }
+      }
+
+      // 1. ถ้าอยู่ในเกม ให้ประมวลผลลูกโป่ง
+      if (currentView === 'balloon-view' && gameActive) {
+        gameCtx.save();
+        gameCtx.clearRect(0, 0, 1280, 720);
+        gameCtx.translate(1280, 0); gameCtx.scale(-1, 1);
+        gameCtx.drawImage(results.image, 0, 0, 1280, 720);
+        gameCtx.restore();
+
+        updateBalloons();
+      }
+
+      // 2. ประมวลผลการใช้นิ้วมือชี้ปุ่มบนหน้าจอ UI (Dwell Click)
+      processUIDwellClick();
+    }
+
+    // ระบบตรวจจับการค้างนิ้วชี้บนปุ่ม HTML
+    function processUIDwellClick() {
+      if (activeHands.length === 0) {
+        resetDwell();
+        return;
+      }
+
+      // ใช้นิ้วชี้มือแรกในการเล็ง UI
+      const primaryHand = activeHands[0];
+      const hx = primaryHand.screenX;
+      const hy = primaryHand.screenY;
+
+      // ค้นหา Element ใต้ปลายนิ้ว
+      let topEl = document.elementFromPoint(hx, hy);
+      let clickableEl = topEl ? topEl.closest('.btn, .menu-card, select, input, option') : null;
+
+      let isHovering = false;
+      let progress = 0;
+
+      if (clickableEl && Date.now() > clickCooldown) {
+        isHovering = true;
+        
+        if (dwellTarget === clickableEl) {
+          let elapsed = Date.now() - dwellStartTime;
+          progress = Math.min(1, elapsed / DWELL_DURATION);
+
+          if (progress >= 1) {
+            // ถือนิ้วค้างครบ 0.8 วินาที -> สั่งคลิก!
+            clickableEl.click();
+            clickCooldown = Date.now() + 1000; // คูลดาวน์ป้องกันการกดซ้ำ 1 วินาที
+            resetDwell();
+          }
+        } else {
+          dwellTarget = clickableEl;
+          dwellStartTime = Date.now();
+        }
+      } else {
+        resetDwell();
+      }
+
+      // วาดตัวชี้ปลายนิ้ว (Hand Cursor) และ หลอดโหลดทรงกลม บน Global Canvas
+      drawHandCursor(hx, hy, isHovering, progress);
+    }
+
+    function resetDwell() {
+      dwellTarget = null;
+      dwellStartTime = 0;
+    }
+
+    // วาดวงกลมเป้าหมายที่ปลายนิ้วชี้
+    function drawHandCursor(x, y, isHovering, progress) {
+      globalCtx.save();
+      
+      // วาดจุดเล็งตรงกลาง
+      globalCtx.beginPath();
+      globalCtx.arc(x, y, 12, 0, Math.PI * 2);
+      globalCtx.fillStyle = isHovering ? '#00f2fe' : '#ff0055';
+      globalCtx.fill();
+      globalCtx.lineWidth = 3;
+      globalCtx.strokeStyle = '#ffffff';
+      globalCtx.stroke();
+
+      // วาดวงกลมค้าง (Loading Ring) แสดงเวลาที่ถือนิ้วค้างไว้
+      if (isHovering && progress > 0) {
+        globalCtx.beginPath();
+        globalCtx.arc(x, y, 25, -Math.PI / 2, (-Math.PI / 2) + (Math.PI * 2 * progress));
+        globalCtx.lineWidth = 5;
+        globalCtx.strokeStyle = '#00f2fe';
+        globalCtx.stroke();
+      }
+
+      globalCtx.restore();
+    }
+
+    // --- ฟังก์ชัน Login & Server Interaction ---
     async function executeLogin() {
       const name = document.getElementById('login-name').value;
       const room = document.getElementById('login-room').value;
-      if (!name || !room) return Swal.fire('แจ้งเตือน', 'กรุณากรอกข้อมูลให้ครบ', 'warning');
+      if (!name || !room) return Swal.fire('แจ้งเตือน', 'กรุณากรอกชื่อ-นามสกุล', 'warning');
 
       Swal.showLoading();
       try {
@@ -291,33 +457,21 @@
       } catch (err) { Swal.fire('Error', 'เชื่อมต่อเซิร์ฟเวอร์ไม่ได้', 'error'); }
     }
 
-    // --- ระบบเกม Hand Tracking ---
-    async function openBalloonGame() {
+    // --- ระบบเกมลูกโป่ง ---
+    function openBalloonGame() {
       switchView('balloon-view');
       gameScore = 0; gameTime = 30; balloons = [];
       document.getElementById('score-text').innerText = gameScore;
       document.getElementById('time-text').innerText = gameTime;
-      document.getElementById('game-status').innerText = "กำลังเปิดกล้อง... นำมือมาบังหน้าจอเพื่อเริ่ม";
+      document.getElementById('game-status').innerText = "แตะคำตอบที่ถูกต้องด้วยนิ้วชี้!";
       gameActive = true;
 
-      if (!cameraInstance) {
-        cameraInstance = new Camera(videoElement, {
-          onFrame: async () => { if (gameActive) await hands.send({ image: videoElement }); },
-          width: 1280, height: 720
-        });
-        await cameraInstance.start();
-      }
-
-      document.getElementById('game-status').innerText = "เริ่มเกมได้! (แตะคำตอบที่ถูก)";
-      
-      // ตัวนับเวลา
       gameTimerInterval = setInterval(() => {
         gameTime--;
         document.getElementById('time-text').innerText = gameTime;
         if (gameTime <= 0) endGame();
       }, 1000);
 
-      // สร้างลูกโป่ง
       setInterval(() => {
         if (!gameActive) return;
         const q = questionPool[Math.floor(Math.random() * questionPool.length)];
@@ -330,82 +484,33 @@
       }, 1200);
     }
 
-    function onResults(results) {
-      if (!gameActive) return;
-      canvasCtx.save();
-      canvasCtx.clearRect(0, 0, 1280, 720);
-      
-      // วาดวิดีโอแบบกลับซ้าย-ขวา
-      canvasCtx.translate(1280, 0);
-      canvasCtx.scale(-1, 1);
-      canvasCtx.drawImage(results.image, 0, 0, 1280, 720);
-      canvasCtx.restore(); // คืนค่าแกน X ให้เป็นปกติ เพื่อวาดจุดเล็งและลูกโป่ง
-
-      activeHands = []; // รีเซ็ตตำแหน่งมือในแต่ละเฟรม
-
-      // ดึงข้อมูลพิกัดมือที่ตรวจจับได้ (อาจจะมี 1 หรือ 2 มือ)
-      if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
-        for (let i = 0; i < results.multiHandLandmarks.length; i++) {
-          const indexTip = results.multiHandLandmarks[i][8]; // จุดที่ 8 คือปลายนิ้วชี้
-          
-          // คำนวณพิกัดให้ตรงกับวิดีโอที่โดนกลับซ้ายขวา
-          const hx = (1 - indexTip.x) * 1280;
-          const hy = indexTip.y * 720;
-          
-          activeHands.push({ x: hx, y: hy });
-
-          // วาดจุดเล็งเป้าสีแดงที่ปลายนิ้วชี้แต่ละข้าง
-          canvasCtx.beginPath();
-          canvasCtx.arc(hx, hy, 15, 0, 2 * Math.PI);
-          canvasCtx.fillStyle = '#ff0055'; 
-          canvasCtx.fill();
-          canvasCtx.lineWidth = 4; 
-          canvasCtx.strokeStyle = '#fff'; 
-          canvasCtx.stroke();
-        }
-      }
-
-      updateBalloons();
-    }
-
     function updateBalloons() {
       for (let i = balloons.length - 1; i >= 0; i--) {
         let b = balloons[i];
         b.y -= b.speed;
         
-        // วาดตัวลูกโป่ง
-        canvasCtx.beginPath();
-        canvasCtx.arc(b.x, b.y, b.radius, 0, Math.PI * 2);
-        canvasCtx.fillStyle = b.color; 
-        canvasCtx.fill();
-        canvasCtx.lineWidth = 3; 
-        canvasCtx.strokeStyle = '#fff'; 
-        canvasCtx.stroke();
+        gameCtx.beginPath();
+        gameCtx.arc(b.x, b.y, b.radius, 0, Math.PI * 2);
+        gameCtx.fillStyle = b.color; gameCtx.fill();
+        gameCtx.lineWidth = 3; gameCtx.strokeStyle = '#fff'; gameCtx.stroke();
         
-        // วาดข้อความ
-        canvasCtx.fillStyle = '#fff';
-        canvasCtx.font = 'bold 20px Kanit';
-        canvasCtx.textAlign = 'center';
-        canvasCtx.fillText(b.text, b.x, b.y + 6);
+        gameCtx.fillStyle = '#fff';
+        gameCtx.font = 'bold 20px Kanit';
+        gameCtx.textAlign = 'center';
+        gameCtx.fillText(b.text, b.x, b.y + 6);
 
-        // เช็กการชนกับ "ทุกมือ" ที่ระบบจับได้ (1 หรือ 2 มือ)
+        // เช็กการจิ้มลูกโป่งจากนิ้วมือทุกข้าง
         let isPopped = false;
         for (let hand of activeHands) {
-          let dist = Math.hypot(hand.x - b.x, hand.y - b.y);
-          if (dist < b.radius + 15) {
+          let dist = Math.hypot(hand.gameX - b.x, hand.gameY - b.y);
+          if (dist < b.radius + 20) {
             gameScore += b.isCorrect ? 10 : -5;
             document.getElementById('score-text').innerText = gameScore;
-            isPopped = true;
-            break; // ถ้าแตะโดนแล้ว ให้หยุดเช็กมือข้างที่เหลือกับลูกโป่งใบนี้
+            isPopped = true; break;
           }
         }
 
-        if (isPopped) {
-          balloons.splice(i, 1);
-          continue;
-        }
-
-        // ลบลูกโป่งถ้าลอยเลยขอบจอ
+        if (isPopped) { balloons.splice(i, 1); continue; }
         if (b.y < -b.radius) balloons.splice(i, 1);
       }
     }
@@ -446,7 +551,7 @@
       switchView('home-view');
     }
 
-    // API ดึงข้อมูล
+    // API ดึงข้อมูล Leaderboard/Dashboard
     async function fetchLeaderboard() {
       try {
         const res = await fetch(`${API_URL}?action=getLeaderboard`).then(r => r.json());
@@ -470,7 +575,7 @@
       } catch (err) {}
     }
 
-    // พื้นหลัง
+    // พื้นหลังดาวระยิบระยับ
     function initParticles() {
       const canvas = document.getElementById('particle-bg');
       const ctx = canvas.getContext('2d');
