@@ -122,7 +122,7 @@
       background: #000; border-radius: 15px; overflow: hidden;
     }
     #input-video { display: none; }
-    #output-canvas { width: 100%; height: 100%; object-fit: cover; }
+    #output-canvas { width: 100%; height: 100%; object-fit: fill; }
     
     .game-hud {
       display: flex; justify-content: space-between; align-items: center;
@@ -322,18 +322,32 @@
       globalCtx.clearRect(0, 0, globalCanvas.width, globalCanvas.height);
       activeHands = [];
 
+      // ดึงขอบเขตตำแหน่งของ Canvas เกมบนหน้าจอ
+      const gameRect = gameCanvas.getBoundingClientRect();
+
       // ดึงพิกัดมือที่ตรวจจับได้
       if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
         for (let i = 0; i < results.multiHandLandmarks.length; i++) {
           const indexTip = results.multiHandLandmarks[i][8]; // ปลายนิ้วชี้
           
-          // แปลงพิกัดเป็นขนาดหน้าจอจริง (Screen Coordinates)
-          const screenX = (1 - indexTip.x) * globalCanvas.width;
-          const screenY = indexTip.y * globalCanvas.height;
+          const mirroredX = 1 - indexTip.x;
+          const mirroredY = indexTip.y;
 
-          // พิกัดบน Canvas สำหรับเกม
-          const gameX = (1 - indexTip.x) * 1280;
-          const gameY = indexTip.y * 720;
+          let screenX, screenY;
+
+          // ถ้าอยู่ในหน้าเกม คำนวณพิกัดเป้าเล็งตามตำแหน่ง Canvas บนหน้าจอ เพื่อให้จุดแดงตรงนิ้วพอดี
+          if (currentView === 'balloon-view') {
+            screenX = gameRect.left + (mirroredX * gameRect.width);
+            screenY = gameRect.top + (mirroredY * gameRect.height);
+          } else {
+            // หน้าอื่นๆ คำนวณเต็มขนาดหน้าจอ window
+            screenX = mirroredX * globalCanvas.width;
+            screenY = mirroredY * globalCanvas.height;
+          }
+
+          // พิกัดบน Canvas สำหรับประมวลผลชนลูกโป่งในเกม (1280x720)
+          const gameX = mirroredX * 1280;
+          const gameY = mirroredY * 720;
 
           activeHands.push({ screenX, screenY, gameX, gameY });
         }
