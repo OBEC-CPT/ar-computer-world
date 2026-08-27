@@ -2,590 +2,303 @@
 <html lang="th">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>AR Computer World - โรงเรียนชลประทานผาแตก</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>IT Balloon Pop - เกมแตะลูกโป่งด้วยมือ (Hand Tracking)</title>
   
+  <!-- Fonts & Icons -->
   <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;600&display=swap" rel="stylesheet">
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-  <script src="https://aframe.io/releases/1.3.0/aframe.min.js"></script>
-  <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
+  
+  <!-- MediaPipe Hand Tracking Libraries -->
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
   <style>
-    :root {
-      --primary-gradient: linear-gradient(135deg, #1e3c72 0%, #2a5298 50%, #681287 100%);
-      --glass-bg: rgba(255, 255, 255, 0.12);
-      --glass-border: rgba(255, 255, 255, 0.25);
-      --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
-      --text-color: #ffffff;
-      --accent-color: #00f2fe;
-    }
-
-    body.light-theme {
-      --primary-gradient: linear-gradient(135deg, #e0c3fc 0%, #8ec5fc 100%);
-      --glass-bg: rgba(255, 255, 255, 0.55);
-      --glass-border: rgba(255, 255, 255, 0.4);
-      --text-color: #1a1a2e;
-    }
-
     * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Kanit', sans-serif; }
+    
+    body {
+      background: #0f172a;
+      color: #fff;
+      overflow: hidden;
+      width: 100vw;
+      height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
 
-    html, body {
+    #game-container {
+      position: relative;
+      width: 1280px;
+      height: 720px;
+      max-width: 100vw;
+      max-height: 100vh;
+      background: #1e293b;
+      border-radius: 20px;
+      overflow: hidden;
+      box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+    }
+
+    /* ซ่อน HTML Video ตัวจริงไว้ ใช้ canvas วาดแทน */
+    #input-video { display: none; }
+
+    #output-canvas {
       width: 100%;
       height: 100%;
-      background: var(--primary-gradient);
-      color: var(--text-color);
-      overflow-x: hidden;
+      object-fit: cover;
     }
 
-    #particle-bg {
-      position: fixed;
-      top: 0; left: 0; width: 100%; height: 100%;
-      z-index: -1; pointer-events: none;
-    }
-
-    .glass-container {
-      max-width: 1200px;
-      margin: 20px auto;
-      padding: 20px;
-      position: relative;
-      z-index: 10;
-    }
-
-    .glass-card {
-      background: var(--glass-bg);
-      backdrop-filter: blur(16px);
-      -webkit-backdrop-filter: blur(16px);
-      border-radius: 20px;
-      border: 1px solid var(--glass-border);
-      box-shadow: var(--glass-shadow);
-      padding: 25px;
-    }
-
-    .app-header {
+    /* แถบแดชบอร์ดแสดงคะแนน */
+    .hud {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      right: 20px;
       display: flex;
       justify-content: space-between;
       align-items: center;
-      padding: 15px 25px;
-      background: var(--glass-bg);
-      backdrop-filter: blur(12px);
+      z-index: 10;
+      pointer-events: none;
+    }
+
+    .score-board {
+      background: rgba(15, 23, 42, 0.85);
+      backdrop-filter: blur(10px);
+      padding: 12px 25px;
+      border-radius: 50px;
+      border: 2px solid #00f2fe;
+      font-size: 1.5rem;
+      font-weight: 600;
+      color: #00f2fe;
+      box-shadow: 0 0 20px rgba(0, 242, 254, 0.3);
+    }
+
+    .guide-box {
+      background: rgba(15, 23, 42, 0.85);
+      backdrop-filter: blur(10px);
+      padding: 10px 20px;
       border-radius: 15px;
-      margin-bottom: 25px;
-      border: 1px solid var(--glass-border);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      color: #f1f5f9;
+      font-size: 1rem;
     }
 
-    .view { display: none; }
-    .view.active { display: block; animation: fadeIn 0.4s ease-in-out; }
-
-    @keyframes fadeIn {
-      from { opacity: 0; transform: translateY(10px); }
-      to { opacity: 1; transform: translateY(0); }
-    }
-
-    .menu-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-      gap: 20px;
-    }
-
-    .menu-card {
-      background: var(--glass-bg);
-      border: 1px solid var(--glass-border);
-      border-radius: 16px;
-      padding: 25px;
-      text-align: center;
+    .btn-start {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      padding: 20px 40px;
+      font-size: 1.8rem;
+      font-weight: 600;
+      color: #fff;
+      background: linear-gradient(135deg, #00c6ff, #0072ff);
+      border: none;
+      border-radius: 50px;
       cursor: pointer;
+      z-index: 20;
+      box-shadow: 0 10px 30px rgba(0, 114, 255, 0.5);
       transition: all 0.3s ease;
     }
 
-    .menu-card:hover {
-      transform: translateY(-5px);
-      background: rgba(255, 255, 255, 0.25);
-      box-shadow: 0 12px 40px rgba(0, 242, 254, 0.3);
-    }
-
-    .menu-card .icon {
-      font-size: 2.5rem;
-      margin-bottom: 15px;
-      color: var(--accent-color);
-    }
-
-    .auth-card {
-      max-width: 450px;
-      margin: 40px auto;
-      text-align: center;
-    }
-
-    .form-group { margin-bottom: 15px; }
-
-    .form-group input, .form-row input, .form-row select {
-      width: 100%;
-      padding: 12px;
-      border-radius: 10px;
-      border: 1px solid var(--glass-border);
-      background: rgba(255, 255, 255, 0.2);
-      color: var(--text-color);
-      outline: none;
-    }
-
-    .form-row {
-      display: flex;
-      gap: 10px;
-      margin-bottom: 20px;
-    }
-
-    .btn {
-      padding: 12px 24px;
-      border: none;
-      border-radius: 12px;
-      font-weight: 600;
-      cursor: pointer;
-      transition: 0.2s;
-    }
-
-    .btn-primary { background: linear-gradient(90deg, #00c6ff, #0072ff); color: white; }
-    .btn-secondary { background: rgba(255, 255, 255, 0.2); color: white; }
-    .btn-danger { background: #ff4757; color: white; }
-    .btn-warning { background: #ffa500; color: white; }
-
-    .data-table {
-      width: 100%;
-      border-collapse: collapse;
-      margin-top: 15px;
-    }
-
-    .data-table th, .data-table td {
-      padding: 12px 15px;
-      text-align: left;
-      border-bottom: 1px solid var(--glass-border);
-    }
-
-    .hidden { display: none !important; }
-
-    /* AR Layer Settings */
-    #ar-screen {
-      display: none;
-      position: fixed;
-      top: 0; left: 0;
-      width: 100vw; height: 100vh;
-      z-index: 999999;
-      background: transparent;
-    }
-
-    .ar-hud-controls {
-      position: fixed;
-      top: 15px; left: 15px; right: 15px;
-      z-index: 2147483647; /* ตั้งค่า z-index สูงสุดเพื่อไม่ให้กล้องบัง */
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      gap: 10px;
-      pointer-events: auto;
-    }
-
-    .ar-guide-text {
-      background: rgba(0, 0, 0, 0.75);
-      color: #00f2fe;
-      padding: 10px 18px;
-      border-radius: 12px;
-      font-size: 0.95rem;
-      border: 1px solid rgba(0, 242, 254, 0.5);
-    }
-
-    .a-enter-vr { display: none !important; }
-
-    html.ar-active, body.ar-active {
-      background: transparent !important;
-      overflow: hidden !important;
-    }
-    
-    html.ar-active #app, 
-    html.ar-active #particle-bg {
-      display: none !important;
-    }
-
-    @media (max-width: 768px) {
-      .glass-container { padding: 10px; }
-      .menu-grid { grid-template-columns: 1fr; }
-      .ar-hud-controls { flex-direction: column; align-items: flex-start; }
+    .btn-start:hover {
+      transform: translate(-50%, -50%) scale(1.05);
+      box-shadow: 0 15px 40px rgba(0, 242, 254, 0.8);
     }
   </style>
 </head>
-<body class="dark-theme">
+<body>
 
-  <canvas id="particle-bg"></canvas>
-
-  <div id="app" class="glass-container">
-    <header class="app-header">
-      <div class="logo"><i class="fa-solid fa-microchip"></i> AR IT WORLD</div>
-      <div id="user-badge-bar" class="user-badge-bar hidden">
-        <span id="user-display-name">นักเรียน</span>
-        <span id="user-level-tag" class="level-tag">LV1</span>
+  <div id="game-container">
+    <!-- แถบแสดงคะแนนและคำแนะนำ -->
+    <div class="hud">
+      <div class="score-board">
+        <i class="fa-solid fa-star" style="color:#ffd700;"></i> คะแนน: <span id="score-text">0</span>
       </div>
-      <div class="theme-toggle" onclick="toggleTheme()" style="cursor: pointer;">
-        <i class="fa-solid fa-moon" id="theme-icon"></i>
+      <div class="guide-box">
+        <i class="fa-solid fa-hand-pointer" style="color:#00f2fe;"></i> ใช้นิ้วชี้จิ้มลูกโป่งคำถามที่<b>"ถูกต้อง"</b>
       </div>
-    </header>
-
-    <main class="view-content">
-
-      <!-- 1. LOGIN VIEW -->
-      <section id="login-view" class="view active">
-        <div class="glass-card auth-card">
-          <h2><i class="fa-solid fa-laptop-code"></i> เข้าสู่ระบบการเรียนรู้</h2>
-          <p class="subtitle" style="margin-bottom: 20px;">โรงเรียนชลประทานผาแตก (ปัญญาพลอุปถัมภ์)</p>
-          <div class="form-group">
-            <input type="text" id="login-name" placeholder="ชื่อ-นามสกุล" required />
-          </div>
-          <div class="form-row">
-            <select id="login-class">
-              <option value="1">มัธยมศึกษาปีที่ 1</option>
-              <option value="2">มัธยมศึกษาปีที่ 2</option>
-              <option value="3">มัธยมศึกษาปีที่ 3</option>
-            </select>
-            <input type="number" id="login-room" placeholder="ห้อง (เช่น 1)" min="1" max="10" />
-          </div>
-          <button class="btn btn-primary" style="width:100%;" onclick="executeLogin()">
-            <i class="fa-solid fa-right-to-bracket"></i> เริ่มต้นใช้งาน
-          </button>
-        </div>
-      </section>
-
-      <!-- 2. HOME MENU VIEW -->
-      <section id="home-view" class="view">
-        <div class="menu-grid">
-          <div class="menu-card" onclick="openAR()">
-            <i class="fa-solid fa-camera-rotate icon"></i>
-            <h3>สแกน AR Hardware</h3>
-            <p>สแกน Marker สำรวจอุปกรณ์ 3D</p>
-          </div>
-          <div class="menu-card" onclick="switchView('minigame-view')">
-            <i class="fa-solid fa-gamepad icon"></i>
-            <h3>มินิเกมและภารกิจ</h3>
-            <p>ประกอบคอมพิวเตอร์ & จับคู่</p>
-          </div>
-          <div class="menu-card" onclick="switchView('leaderboard-view')">
-            <i class="fa-solid fa-trophy icon"></i>
-            <h3>ตารางคะแนน</h3>
-            <p>Top 100 Realtime Leaderboard</p>
-          </div>
-          <div class="menu-card" onclick="switchView('dashboard-view')">
-            <i class="fa-solid fa-chart-line icon"></i>
-            <h3>Dashboard ครู</h3>
-            <p>วิเคราะห์สถิติและการตอบคำถาม</p>
-          </div>
-        </div>
-      </section>
-
-      <!-- 3. MINI GAMES VIEW -->
-      <section id="minigame-view" class="view">
-        <button class="btn btn-secondary" style="margin-bottom: 15px;" onclick="switchView('home-view')"><i class="fa-solid fa-arrow-left"></i> กลับหน้าหลัก</button>
-        <div class="game-selector">
-          <button class="btn btn-primary" onclick="loadMiniGame('boot')">เรียงลำดับ Boot Sequence</button>
-        </div>
-        <div id="game-stage" class="glass-card" style="margin-top: 15px;"></div>
-      </section>
-
-      <!-- 4. LEADERBOARD VIEW -->
-      <section id="leaderboard-view" class="view">
-        <button class="btn btn-secondary" style="margin-bottom: 15px;" onclick="switchView('home-view')"><i class="fa-solid fa-arrow-left"></i> กลับหน้าหลัก</button>
-        <div class="glass-card">
-          <h2><i class="fa-solid fa-ranking-star"></i> อันดับผู้เล่นสูงสุด (Top 100)</h2>
-          <table class="data-table" id="leaderboard-table">
-            <thead>
-              <tr><th>อันดับ</th><th>ชื่อ-นามสกุล</th><th>ระดับ</th><th>EXP</th></tr>
-            </thead>
-            <tbody></tbody>
-          </table>
-        </div>
-      </section>
-
-      <!-- 5. DASHBOARD VIEW -->
-      <section id="dashboard-view" class="view">
-        <button class="btn btn-secondary" style="margin-bottom: 15px;" onclick="switchView('home-view')"><i class="fa-solid fa-arrow-left"></i> กลับหน้าหลัก</button>
-        <div class="glass-card" style="margin-bottom: 15px;">
-          <h4>จำนวนนักเรียนในระบบ: <span id="metric-students">0</span> คน</h4>
-          <h4>จำนวนการเข้าร่วมกิจกรรม: <span id="metric-plays">0</span> ครั้ง</h4>
-        </div>
-        <div class="glass-card">
-          <canvas id="chart-levels" height="150"></canvas>
-        </div>
-      </section>
-
-    </main>
-  </div>
-
-  <!-- AR SCREEN CONTAINER -->
-  <div id="ar-screen">
-    <div class="ar-hud-controls">
-      <button class="btn btn-danger" onclick="closeAR()">
-        <i class="fa-solid fa-xmark"></i> ปิดกล้อง
-      </button>
-      <div class="ar-guide-text">
-        <i class="fa-solid fa-qrcode"></i> นำรูป Hiro Marker มาจ่อส่องหน้ากล้อง
-      </div>
-      <button class="btn btn-warning" onclick="window.open('https://raw.githubusercontent.com/AR-js-org/AR.js/master/data/images/hiro.png', '_blank')">
-        <i class="fa-solid fa-image"></i> เปิดดูรูป Hiro Marker
-      </button>
     </div>
-    <div id="ar-scene-holder" style="width:100%; height:100%;"></div>
+
+    <button id="start-btn" class="btn-start" onclick="startGame()">
+      <i class="fa-solid fa-play"></i> เริ่มเล่นเกมแตะลูกโป่ง
+    </button>
+
+    <!-- กล้องเว็บแคมและ Canvas วาดผลลัพธ์ -->
+    <video id="input-video" playsinline></video>
+    <canvas id="output-canvas" width="1280" height="720"></canvas>
   </div>
 
   <script>
-    const API_URL = "https://script.google.com/macros/s/AKfycbwtBoPKE5fCsuv_ctxqybUjYed14PblkrBOp5vMm87ggNbnuGC0pj7BAscD86aPSTfuIQ/exec";
+    const videoElement = document.getElementById('input-video');
+    const canvasElement = document.getElementById('output-canvas');
+    const canvasCtx = canvasElement.getContext('2d');
+    const scoreText = document.getElementById('score-text');
+    const startBtn = document.getElementById('start-btn');
 
-    let currentUser = null;
-    let chartInstance = null;
-    let currentStep = 1;
+    let score = 0;
+    let gameActive = false;
+    let balloons = [];
+    let handPoint = { x: 0, y: 0, visible: false };
 
-    document.addEventListener('DOMContentLoaded', () => {
-      initParticles();
+    // คลังคำถามลูกโป่ง (ข้อความ, ความถูกต้อง true/false)
+    const questionPool = [
+      { text: "CPU: ประมวลผล", isCorrect: true },
+      { text: "RAM: ความจำชั่วคราว", isCorrect: true },
+      { text: "Mouse: หน่วยแสดงผล", isCorrect: false },
+      { text: "Monitor: หน่วยรับข้อมูล", isCorrect: false },
+      { text: "GPU: ประมวลผลกราฟิก", isCorrect: true },
+      { text: "Keyboard: หน่วยส่งออก", isCorrect: false },
+      { text: "SSD: บันทึกข้อมูล", isCorrect: true },
+      { text: "Printer: หน่วยรับเข้า", isCorrect: false }
+    ];
+
+    // ตั้งค่า MediaPipe Hands
+    const hands = new Hands({
+      locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
     });
 
-    function switchView(viewId) {
-      document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
-      const targetView = document.getElementById(viewId);
-      if (targetView) targetView.classList.add('active');
+    hands.setOptions({
+      maxNumHands: 1,
+      modelComplexity: 1,
+      minDetectionConfidence: 0.6,
+      minTrackingConfidence: 0.6
+    });
 
-      if (viewId === 'leaderboard-view') fetchLeaderboard();
-      if (viewId === 'dashboard-view') fetchDashboard();
-    }
+    hands.onResults(onResults);
 
-    async function openAR() {
-      await releaseWebcam();
-
-      document.documentElement.classList.add('ar-active');
-      document.body.classList.add('ar-active');
+    // ระบบตรวจจับพิกัดนิ้วมือ
+    function onResults(results) {
+      // วาดภาพภาพจากกล้องแบบสลับซ้ายขวา (Mirror)
+      canvasCtx.save();
+      canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
       
-      const arScreen = document.getElementById('ar-screen');
-      arScreen.style.display = 'block';
+      canvasCtx.translate(canvasElement.width, 0);
+      canvasCtx.scale(-1, 1);
+      canvasCtx.drawImage(results.image, 0, 0, canvasElement.width, canvasElement.height);
 
-      const holder = document.getElementById('ar-scene-holder');
-      holder.innerHTML = `
-        <a-scene embedded arjs="sourceType: webcam; debugUIEnabled: false; videoSettings: { facingMode: 'environment' };" vr-mode-ui="enabled: false">
-          <a-marker preset="hiro">
-            <a-box position="0 0.5 0" material="color: #00f2fe; opacity: 0.85;" animation="property: rotation; to: 0 360 0; loop: true; dur: 4000"></a-box>
-            <a-text value="CPU Central Processing Unit" position="0 1.2 0" align="center" color="#FFFFFF" scale="1.5 1.5 1.5"></a-text>
-          </a-marker>
-          <a-entity camera></a-entity>
-        </a-scene>
-      `;
+      if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+        const landmarks = results.multiHandLandmarks[0];
+        // ตำแหน่ง 8 คือ ปลายนิ้วชี้ (Index Finger Tip)
+        const indexTip = landmarks[8];
+
+        handPoint.x = (1 - indexTip.x) * canvasElement.width; // ปรับพิกัดตามการ Mirror
+        handPoint.y = indexTip.y * canvasElement.height;
+        handPoint.visible = true;
+
+        // วาดจุดเล็งเป้าหมายที่ปลายนิ้วชี้
+        canvasCtx.restore();
+        drawFingerTarget(handPoint.x, handPoint.y);
+      } else {
+        handPoint.visible = false;
+        canvasCtx.restore();
+      }
+
+      if (gameActive) {
+        updateAndDrawBalloons();
+      }
     }
 
-    async function releaseWebcam() {
-      document.querySelectorAll('video').forEach(video => {
-        if (video.srcObject && video.srcObject.getTracks) {
-          video.srcObject.getTracks().forEach(track => track.stop());
-        }
-        video.remove();
+    // วาดวงกลมเป้าหมายตามนิ้วชี้
+    function drawFingerTarget(x, y) {
+      canvasCtx.beginPath();
+      canvasCtx.arc(x, y, 15, 0, 2 * Math.PI);
+      canvasCtx.fillStyle = '#ff0055';
+      canvasCtx.fill();
+      canvasCtx.lineWidth = 4;
+      canvasCtx.strokeStyle = '#ffffff';
+      canvasCtx.stroke();
+    }
+
+    // สร้างลูกโป่งใหม่
+    function spawnBalloon() {
+      if (!gameActive) return;
+      const q = questionPool[Math.floor(Math.random() * questionPool.length)];
+      balloons.push({
+        x: Math.random() * (canvasElement.width - 200) + 100,
+        y: canvasElement.height + 60,
+        radius: 65,
+        speed: Math.random() * 2 + 2,
+        text: q.text,
+        isCorrect: q.isCorrect,
+        color: q.isCorrect ? '#00c6ff' : '#ff4757'
       });
     }
 
-    async function closeAR() {
-      await releaseWebcam();
+    // อัปเดตตำแหน่งลูกโป่งและตรวจเช็กการชนกับนิ้วมือ
+    function updateAndDrawBalloons() {
+      for (let i = balloons.length - 1; i >= 0; i--) {
+        let b = balloons[i];
+        b.y -= b.speed; // ลูกโป่งลอยขึ้นด้านบน
 
-      document.getElementById('ar-scene-holder').innerHTML = '';
-      document.getElementById('ar-screen').style.display = 'none';
+        // วาดตัวลูกโป่ง
+        canvasCtx.beginPath();
+        canvasCtx.arc(b.x, b.y, b.radius, 0, Math.PI * 2);
+        canvasCtx.fillStyle = b.color;
+        canvasCtx.globalAlpha = 0.85;
+        canvasCtx.fill();
+        canvasCtx.lineWidth = 3;
+        canvasCtx.strokeStyle = '#ffffff';
+        canvasCtx.stroke();
+        canvasCtx.globalAlpha = 1.0;
 
-      document.documentElement.classList.remove('ar-active', 'a-fullscreen');
-      document.body.classList.remove('ar-active', 'a-fullscreen');
+        // วาดข้อความคำถามในลูกโป่ง
+        canvasCtx.fillStyle = '#ffffff';
+        canvasCtx.font = 'bold 18px Kanit';
+        canvasCtx.textAlign = 'center';
+        canvasCtx.fillText(b.text, b.x, b.y + 6);
+
+        // เช็กว่านิ้วชี้เอื้อมมาแตะลูกโป่งหรือไม่ (Collision Detection)
+        if (handPoint.visible) {
+          let dist = Math.hypot(handPoint.x - b.x, handPoint.y - b.y);
+          if (dist < b.radius + 15) { // แตะถูกลูกโป่ง
+            if (b.isCorrect) {
+              score += 10;
+              showPopEffect(b.x, b.y, "+10", "#2ed573");
+            } else {
+              score = Math.max(0, score - 5);
+              showPopEffect(b.x, b.y, "-5", "#ff4757");
+            }
+            scoreText.innerText = score;
+            balloons.splice(i, 1);
+            continue;
+          }
+        }
+
+        // ลบลูกโป่งออกเมื่อลอยเลยขอบบน
+        if (b.y < -b.radius) {
+          balloons.splice(i, 1);
+        }
+      }
+    }
+
+    // แสดง Effect ข้อความเมื่อลูกโป่งแตก
+    function showPopEffect(x, y, text, color) {
+      canvasCtx.fillStyle = color;
+      canvasCtx.font = 'bold 35px Kanit';
+      canvasCtx.fillText(text, x, y);
+    }
+
+    // เริ่มต้นระบบกล้องและเกม
+    async function startGame() {
+      startBtn.style.display = 'none';
+      score = 0;
+      scoreText.innerText = score;
+      gameActive = true;
+
+      const camera = new Camera(videoElement, {
+        onFrame: async () => {
+          await hands.send({ image: videoElement });
+        },
+        width: 1280,
+        height: 720
+      });
+
+      await camera.start();
       
-      document.documentElement.style.cssText = "";
-      document.body.style.cssText = "";
-
-      switchView('home-view');
-      window.scrollTo(0, 0);
-    }
-
-    async function executeLogin() {
-      const name = document.getElementById('login-name').value;
-      const studentClass = document.getElementById('login-class').value;
-      const room = document.getElementById('login-room').value;
-
-      if (!name || !room) {
-        Swal.fire('กรุณากรอกข้อมูล', 'โปรดระบุชื่อและห้องเรียนให้ครบถ้วน', 'warning');
-        return;
-      }
-
-      Swal.showLoading();
-      const payload = {
-        action: 'login',
-        userData: {
-          email: `${name.toLowerCase().replace(/\s+/g, '')}@student.ac.th`,
-          name: name,
-          class: studentClass,
-          room: room
-        }
-      };
-
-      try {
-        const response = await fetch(API_URL, {
-          method: 'POST',
-          body: JSON.stringify(payload)
-        });
-        const res = await response.json();
-        Swal.close();
-
-        if (res.status === 'success') {
-          currentUser = res.data;
-          document.getElementById('user-display-name').innerText = currentUser.name;
-          document.getElementById('user-level-tag').innerText = currentUser.level;
-          document.getElementById('user-badge-bar').classList.remove('hidden');
-          switchView('home-view');
-          Swal.fire('ยินดีต้อนรับ!', `สวัสดี ${currentUser.name} เข้าสู่โลกเทคโนโลยี`, 'success');
-        } else {
-          Swal.fire('เกิดข้อผิดพลาด', res.message || 'ไม่สามารถเข้าสู่ระบบได้', 'error');
-        }
-      } catch (err) {
-        Swal.close();
-        Swal.fire('Error', 'ไม่สามารถเชื่อมต่อเครื่องเซิร์ฟเวอร์ได้', 'error');
-        console.error(err);
-      }
-    }
-
-    function loadMiniGame(type) {
-      const stage = document.getElementById('game-stage');
-      if (type === 'boot') {
-        stage.innerHTML = `
-          <h3><i class="fa-solid fa-list-ol"></i> เรียงลำดับขั้นตอนการ Boot คอมพิวเตอร์</h3>
-          <p style="margin-bottom:15px;">คลิกตามลำดับขั้นตอนที่ถูกต้อง</p>
-          <div id="sortable-list">
-            <button class="btn btn-secondary" style="width:100%; margin-bottom:10px;" onclick="checkBootStep(this, 1)">1. Power On (เปิดสวิตช์ไฟ)</button>
-            <button class="btn btn-secondary" style="width:100%; margin-bottom:10px;" onclick="checkBootStep(this, 2)">2. POST (ตรวจสอบฮาร์ดแวร์)</button>
-            <button class="btn btn-secondary" style="width:100%; margin-bottom:10px;" onclick="checkBootStep(this, 3)">3. Load BIOS / UEFI</button>
-            <button class="btn btn-secondary" style="width:100%; margin-bottom:10px;" onclick="checkBootStep(this, 4)">4. Load Operating System (OS)</button>
-            <button class="btn btn-secondary" style="width:100%; margin-bottom:10px;" onclick="checkBootStep(this, 5)">5. Desktop Ready (พร้อมใช้งาน)</button>
-          </div>
-        `;
-      }
-    }
-
-    async function checkBootStep(el, step) {
-      if (step === currentStep) {
-        el.style.background = '#2ed573';
-        currentStep++;
-        if (currentStep > 5) {
-          Swal.fire('สำเร็จ!', 'คุณเรียงลำดับขั้นตอน Boot เครื่องถูกต้อง +50 EXP', 'success');
-          await addEXP(50, 'MiniGame: Boot Sequence');
-          currentStep = 1;
-        }
-      } else {
-        el.style.background = '#ff4757';
-        Swal.fire('ผิดพลาด', 'ลำดับไม่ถูกต้อง กรุณาลองใหม่อีกครั้ง', 'error');
-        currentStep = 1;
-      }
-    }
-
-    async function addEXP(expGained, activityName) {
-      if (!currentUser) return;
-      try {
-        const response = await fetch(API_URL, {
-          method: 'POST',
-          body: JSON.stringify({
-            action: 'addExp',
-            email: currentUser.email,
-            expGained: expGained,
-            activityName: activityName
-          })
-        });
-        const res = await response.json();
-        if (res.status === 'success') {
-          currentUser.exp = res.data.exp;
-          currentUser.level = res.data.level;
-          document.getElementById('user-level-tag').innerText = currentUser.level;
-        }
-      } catch (err) {
-        console.error("Add EXP Error:", err);
-      }
-    }
-
-    async function fetchLeaderboard() {
-      try {
-        const response = await fetch(`${API_URL}?action=getLeaderboard`);
-        const res = await response.json();
-        if (res.status === 'success') {
-          const tbody = document.querySelector('#leaderboard-table tbody');
-          tbody.innerHTML = '';
-          res.data.forEach((row, idx) => {
-            tbody.innerHTML += `
-              <tr>
-                <td>${idx + 1}</td>
-                <td>${row.name} (${row.class})</td>
-                <td>${row.level}</td>
-                <td>${row.exp} EXP</td>
-              </tr>
-            `;
-          });
-        }
-      } catch (err) {
-        console.error("Leaderboard Error:", err);
-      }
-    }
-
-    async function fetchDashboard() {
-      try {
-        const response = await fetch(`${API_URL}?action=getDashboard`);
-        const res = await response.json();
-        if (res.status === 'success') {
-          const data = res.data;
-          document.getElementById('metric-students').innerText = data.totalStudents;
-          document.getElementById('metric-plays').innerText = data.totalPlays;
-
-          const ctx = document.getElementById('chart-levels').getContext('2d');
-          if (chartInstance) chartInstance.destroy();
-          
-          chartInstance = new Chart(ctx, {
-            type: 'bar',
-            data: {
-              labels: Object.keys(data.levelDistribution),
-              datasets: [{
-                label: 'จำนวนนักเรียนจำแนกตาม Level',
-                data: Object.values(data.levelDistribution),
-                backgroundColor: '#00f2fe'
-              }]
-            },
-            options: { responsive: true, plugins: { legend: { labels: { color: 'white' } } } }
-          });
-        }
-      } catch (err) {
-        console.error("Dashboard Error:", err);
-      }
-    }
-
-    function toggleTheme() {
-      document.body.classList.toggle('light-theme');
-    }
-
-    function initParticles() {
-      const canvas = document.getElementById('particle-bg');
-      const ctx = canvas.getContext('2d');
-      canvas.width = window.innerWidth;
-      canvas.height = window.innerHeight;
-
-      let particles = Array.from({ length: 40 }, () => ({
-        x: Math.random() * canvas.width,
-        y: Math.random() * canvas.height,
-        radius: Math.random() * 3 + 1,
-        dx: (Math.random() - 0.5) * 1.5,
-        dy: (Math.random() - 0.5) * 1.5
-      }));
-
-      function animate() {
-        requestAnimationFrame(animate);
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
-        
-        particles.forEach(p => {
-          p.x += p.dx; p.y += p.dy;
-          if (p.x < 0 || p.x > canvas.width) p.dx *= -1;
-          if (p.y < 0 || p.y > canvas.height) p.dy *= -1;
-          ctx.beginPath();
-          ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
-          ctx.fill();
-        });
-      }
-      animate();
+      // ให้ลูกโป่งทยอยลอยขึ้นมาทุกๆ 1.5 วินาที
+      setInterval(spawnBalloon, 1500);
     }
   </script>
 </body>
