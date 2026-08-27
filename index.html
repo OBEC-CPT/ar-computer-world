@@ -161,45 +161,26 @@
       border-bottom: 1px solid var(--glass-border);
     }
 
-    .ar-overlay {
-      position: fixed;
-      top: 20px;
-      left: 20px;
-      z-index: 999999;
-    }
-
     .hidden { display: none !important; }
 
-    /* Control Styles specifically for AR Mode */
-    body.ar-mode {
-      background: transparent !important;
-      overflow: hidden !important;
+    /* Fullscreen AR Screen (Independent from Main UI) */
+    #ar-screen {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      z-index: 999999;
+      background: #000;
     }
-    body.ar-mode #particle-bg,
-    body.ar-mode .app-header {
-      display: none !important;
-    }
-    body.ar-mode .glass-container {
-      margin: 0 !important;
-      padding: 0 !important;
-      max-width: 100% !important;
-    }
-    body.ar-mode video {
-      position: fixed !important;
-      top: 0 !important;
-      left: 0 !important;
-      width: 100vw !important;
-      height: 100vh !important;
-      object-fit: cover !important;
-      z-index: -2 !important;
-    }
-    body.ar-mode a-scene {
-      position: fixed !important;
-      top: 0 !important;
-      left: 0 !important;
-      width: 100vw !important;
-      height: 100vh !important;
-      z-index: -1 !important;
+
+    .ar-close-btn {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      z-index: 1000000;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.5);
     }
 
     @media (max-width: 768px) {
@@ -212,6 +193,7 @@
 
   <canvas id="particle-bg"></canvas>
 
+  <!-- MAIN APPLICATION UI CONTAINER -->
   <div id="app" class="glass-container">
     <header class="app-header">
       <div class="logo"><i class="fa-solid fa-microchip"></i> AR IT WORLD</div>
@@ -251,7 +233,7 @@
       <!-- 2. HOME MENU VIEW -->
       <section id="home-view" class="view">
         <div class="menu-grid">
-          <div class="menu-card" onclick="switchView('ar-view')">
+          <div class="menu-card" onclick="openAR()">
             <i class="fa-solid fa-camera-rotate icon"></i>
             <h3>สแกน AR Hardware</h3>
             <p>สแกน Marker สำรวจอุปกรณ์ 3D</p>
@@ -274,15 +256,7 @@
         </div>
       </section>
 
-      <!-- 3. AR CAMERA VIEW -->
-      <section id="ar-view" class="view">
-        <div class="ar-overlay">
-          <button class="btn btn-danger" onclick="switchView('home-view')"><i class="fa-solid fa-xmark"></i> ปิดกล้อง</button>
-        </div>
-        <div id="ar-scene-container"></div>
-      </section>
-
-      <!-- 4. MINI GAMES VIEW -->
+      <!-- 3. MINI GAMES VIEW -->
       <section id="minigame-view" class="view">
         <button class="btn btn-secondary" style="margin-bottom: 15px;" onclick="switchView('home-view')"><i class="fa-solid fa-arrow-left"></i> กลับหน้าหลัก</button>
         <div class="game-selector">
@@ -291,7 +265,7 @@
         <div id="game-stage" class="glass-card" style="margin-top: 15px;"></div>
       </section>
 
-      <!-- 5. LEADERBOARD VIEW -->
+      <!-- 4. LEADERBOARD VIEW -->
       <section id="leaderboard-view" class="view">
         <button class="btn btn-secondary" style="margin-bottom: 15px;" onclick="switchView('home-view')"><i class="fa-solid fa-arrow-left"></i> กลับหน้าหลัก</button>
         <div class="glass-card">
@@ -305,7 +279,7 @@
         </div>
       </section>
 
-      <!-- 6. DASHBOARD VIEW -->
+      <!-- 5. DASHBOARD VIEW -->
       <section id="dashboard-view" class="view">
         <button class="btn btn-secondary" style="margin-bottom: 15px;" onclick="switchView('home-view')"><i class="fa-solid fa-arrow-left"></i> กลับหน้าหลัก</button>
         <div class="glass-card" style="margin-bottom: 15px;">
@@ -320,6 +294,14 @@
     </main>
   </div>
 
+  <!-- SEPARATE AR SCREEN CONTAINER (OUTSIDE #APP) -->
+  <div id="ar-screen">
+    <button class="btn btn-danger ar-close-btn" onclick="closeAR()">
+      <i class="fa-solid fa-xmark"></i> ปิดกล้อง
+    </button>
+    <div id="ar-scene-holder" style="width:100%; height:100%;"></div>
+  </div>
+
   <script>
     const API_URL = "https://script.google.com/macros/s/AKfycbwtBoPKE5fCsuv_ctxqybUjYed14PblkrBOp5vMm87ggNbnuGC0pj7BAscD86aPSTfuIQ/exec";
 
@@ -331,11 +313,38 @@
       initParticles();
     });
 
-    function stopARScene() {
-      document.body.classList.remove('ar-mode');
-      const container = document.getElementById('ar-scene-container');
-      if (container) container.innerHTML = '';
+    function switchView(viewId) {
+      document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+      const targetView = document.getElementById(viewId);
+      if (targetView) targetView.classList.add('active');
 
+      if (viewId === 'leaderboard-view') fetchLeaderboard();
+      if (viewId === 'dashboard-view') fetchDashboard();
+    }
+
+    function openAR() {
+      // Hide standard UI elements completely to prevent container conflicts
+      document.getElementById('app').style.display = 'none';
+      document.getElementById('particle-bg').style.display = 'none';
+      
+      const arScreen = document.getElementById('ar-screen');
+      arScreen.style.display = 'block';
+
+      // Dynamically load clean AR.js scene in isolated viewport
+      const holder = document.getElementById('ar-scene-holder');
+      holder.innerHTML = `
+        <a-scene embedded arjs="sourceType: webcam; debugUIEnabled: false;">
+          <a-marker preset="hiro">
+            <a-box position="0 0.5 0" material="color: #00f2fe; opacity: 0.8;" animation="property: rotation; to: 0 360 0; loop: true; dur: 4000"></a-box>
+            <a-text value="CPU Central Processing Unit" position="0 1.2 0" align="center" color="#FFFFFF"></a-text>
+          </a-marker>
+          <a-entity camera></a-entity>
+        </a-scene>
+      `;
+    }
+
+    function closeAR() {
+      // Turn off webcam tracks cleanly
       document.querySelectorAll('video').forEach(video => {
         if (video.srcObject && video.srcObject.getTracks) {
           video.srcObject.getTracks().forEach(track => track.stop());
@@ -343,25 +352,20 @@
         video.remove();
       });
 
+      // Clear scene and hide AR screen
+      document.getElementById('ar-scene-holder').innerHTML = '';
+      document.getElementById('ar-screen').style.display = 'none';
+
+      // Restore standard UI
+      document.getElementById('app').style.display = 'block';
+      document.getElementById('particle-bg').style.display = 'block';
+
+      // Remove unwanted inline body/html styles set by AR.js
       document.body.removeAttribute('style');
       document.documentElement.removeAttribute('style');
+
+      switchView('home-view');
       window.scrollTo(0, 0);
-    }
-
-    function switchView(viewId) {
-      if (viewId !== 'ar-view') {
-        stopARScene();
-      } else {
-        document.body.classList.add('ar-mode');
-      }
-
-      document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
-      const targetView = document.getElementById(viewId);
-      if (targetView) targetView.classList.add('active');
-
-      if (viewId === 'ar-view') initARScene();
-      if (viewId === 'leaderboard-view') fetchLeaderboard();
-      if (viewId === 'dashboard-view') fetchDashboard();
     }
 
     async function executeLogin() {
@@ -408,20 +412,6 @@
         Swal.fire('Error', 'ไม่สามารถเชื่อมต่อเครื่องเซิร์ฟเวอร์ได้', 'error');
         console.error(err);
       }
-    }
-
-    function initARScene() {
-      const container = document.getElementById('ar-scene-container');
-      container.innerHTML = `
-        <a-scene embedded arjs="sourceType: webcam; debugUIEnabled: false;">
-          <a-marker preset="hiro">
-            <a-box position="0 0.5 0" material="color: #00f2fe; opacity: 0.8;" animation="property: rotation; to: 0 360 0; loop: true; dur: 4000">
-            </a-box>
-            <a-text value="CPU Central Processing Unit" position="0 1.2 0" align="center" color="#FFFFFF"></a-text>
-          </a-marker>
-          <a-entity camera></a-entity>
-        </a-scene>
-      `;
     }
 
     function loadMiniGame(type) {
