@@ -32,11 +32,11 @@
 
     * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Kanit', sans-serif; }
 
-    body {
-      background: var(--primary-gradient);
+    html, body {
+      width: 100%;
       min-height: 100vh;
+      background: var(--primary-gradient);
       color: var(--text-color);
-      overflow-x: hidden;
     }
 
     #particle-bg {
@@ -49,6 +49,8 @@
       max-width: 1200px;
       margin: 20px auto;
       padding: 20px;
+      position: relative;
+      z-index: 10;
     }
 
     .glass-card {
@@ -145,7 +147,6 @@
     .btn-primary { background: linear-gradient(90deg, #00c6ff, #0072ff); color: white; }
     .btn-secondary { background: rgba(255, 255, 255, 0.2); color: white; }
     .btn-danger { background: #ff4757; color: white; }
-    .btn-block { width: 100%; }
 
     .data-table {
       width: 100%;
@@ -159,12 +160,11 @@
       border-bottom: 1px solid var(--glass-border);
     }
 
-    /* ปรับปรุงให้ปุ่มปิดกล้องลอยเหนือวิดีโอเสมอ */
     .ar-overlay {
       position: fixed;
       top: 20px;
       left: 20px;
-      z-index: 99999;
+      z-index: 999999;
     }
 
     .hidden { display: none !important; }
@@ -209,7 +209,7 @@
             </select>
             <input type="number" id="login-room" placeholder="ห้อง (เช่น 1)" min="1" max="10" />
           </div>
-          <button class="btn btn-primary btn-block" onclick="executeLogin()">
+          <button class="btn btn-primary" style="width:100%;" onclick="executeLogin()">
             <i class="fa-solid fa-right-to-bracket"></i> เริ่มต้นใช้งาน
           </button>
         </div>
@@ -244,7 +244,7 @@
       <!-- 3. AR CAMERA VIEW -->
       <section id="ar-view" class="view">
         <div class="ar-overlay">
-          <button class="btn btn-danger btn-sm" onclick="switchView('home-view')"><i class="fa-solid fa-xmark"></i> ปิดกล้อง</button>
+          <button class="btn btn-danger" onclick="switchView('home-view')"><i class="fa-solid fa-xmark"></i> ปิดกล้อง</button>
         </div>
         <div id="ar-scene-container"></div>
       </section>
@@ -298,29 +298,35 @@
       initParticles();
     });
 
-    // ฟังก์ชันสั่งปิดกล้องและลบ Element วิดีโอทิ้งเมื่อออกจากหน้า AR
+    // ฟังก์ชันล้างค่า AR และคืนค่า Style ของ Body ให้กลับมาปกติ 100%
     function stopARScene() {
       const container = document.getElementById('ar-scene-container');
-      container.innerHTML = '';
+      if (container) container.innerHTML = '';
 
-      const videoElements = document.querySelectorAll('video');
-      videoElements.forEach(video => {
+      // ลบแท็ก <video> ทั้งหมดที่ AR.js แอบสร้างไว้ออก
+      document.querySelectorAll('video').forEach(video => {
         if (video.srcObject && video.srcObject.getTracks) {
           video.srcObject.getTracks().forEach(track => track.stop());
         }
         video.remove();
       });
-      document.body.style.overflow = 'auto';
+
+      // ถอนรากถอนโคน Style ที่ AR.js แอบเขียนทับใส่ html และ body
+      document.body.removeAttribute('style');
+      document.documentElement.removeAttribute('style');
+      
+      // ดึงหน้าจอกลับมาจุดบนสุด เพื่อให้ Header แสดงผลตรงตำแหน่งเดิม
+      window.scrollTo(0, 0);
     }
 
     function switchView(viewId) {
-      document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
-      const targetView = document.getElementById(viewId);
-      if (targetView) targetView.classList.add('active');
-
       if (viewId !== 'ar-view') {
         stopARScene();
       }
+
+      document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+      const targetView = document.getElementById(viewId);
+      if (targetView) targetView.classList.add('active');
 
       if (viewId === 'ar-view') initARScene();
       if (viewId === 'leaderboard-view') fetchLeaderboard();
@@ -375,12 +381,13 @@
 
     function initARScene() {
       const container = document.getElementById('ar-scene-container');
+      // กำหนดค่า A-Frame เพื่อป้องกัน idPatt error
       container.innerHTML = `
-        <a-scene embedded arjs="sourceType: webcam; debugUIEnabled: false;">
+        <a-scene embedded arjs="sourceType: webcam; debugUIEnabled: false; detectionMode: mono_and_matrix; matrixCodeType: 3x3;">
           <a-marker preset="hiro">
             <a-box position="0 0.5 0" material="color: #00f2fe; opacity: 0.8;" animation="property: rotation; to: 0 360 0; loop: true; dur: 4000">
             </a-box>
-            <a-text value="CPU Central Processing Unit" position="-1 1.2 0" color="#FFFFFF"></a-text>
+            <a-text value="CPU Central Processing Unit" position="0 1.2 0" align="center" color="#FFFFFF"></a-text>
           </a-marker>
           <a-entity camera></a-entity>
         </a-scene>
@@ -394,11 +401,11 @@
           <h3><i class="fa-solid fa-list-ol"></i> เรียงลำดับขั้นตอนการ Boot คอมพิวเตอร์</h3>
           <p style="margin-bottom:15px;">คลิกตามลำดับขั้นตอนที่ถูกต้อง</p>
           <div id="sortable-list">
-            <button class="btn btn-secondary btn-block" style="margin-bottom:10px;" onclick="checkBootStep(this, 1)">1. Power On (เปิดสวิตช์ไฟ)</button>
-            <button class="btn btn-secondary btn-block" style="margin-bottom:10px;" onclick="checkBootStep(this, 2)">2. POST (ตรวจสอบฮาร์ดแวร์)</button>
-            <button class="btn btn-secondary btn-block" style="margin-bottom:10px;" onclick="checkBootStep(this, 3)">3. Load BIOS / UEFI</button>
-            <button class="btn btn-secondary btn-block" style="margin-bottom:10px;" onclick="checkBootStep(this, 4)">4. Load Operating System (OS)</button>
-            <button class="btn btn-secondary btn-block" style="margin-bottom:10px;" onclick="checkBootStep(this, 5)">5. Desktop Ready (พร้อมใช้งาน)</button>
+            <button class="btn btn-secondary" style="width:100%; margin-bottom:10px;" onclick="checkBootStep(this, 1)">1. Power On (เปิดสวิตช์ไฟ)</button>
+            <button class="btn btn-secondary" style="width:100%; margin-bottom:10px;" onclick="checkBootStep(this, 2)">2. POST (ตรวจสอบฮาร์ดแวร์)</button>
+            <button class="btn btn-secondary" style="width:100%; margin-bottom:10px;" onclick="checkBootStep(this, 3)">3. Load BIOS / UEFI</button>
+            <button class="btn btn-secondary" style="width:100%; margin-bottom:10px;" onclick="checkBootStep(this, 4)">4. Load Operating System (OS)</button>
+            <button class="btn btn-secondary" style="width:100%; margin-bottom:10px;" onclick="checkBootStep(this, 5)">5. Desktop Ready (พร้อมใช้งาน)</button>
           </div>
         `;
       }
