@@ -34,9 +34,10 @@
 
     html, body {
       width: 100%;
-      min-height: 100vh;
+      height: 100%;
       background: var(--primary-gradient);
       color: var(--text-color);
+      overflow-x: hidden;
     }
 
     #particle-bg {
@@ -169,6 +170,38 @@
 
     .hidden { display: none !important; }
 
+    /* Control Styles specifically for AR Mode */
+    body.ar-mode {
+      background: transparent !important;
+      overflow: hidden !important;
+    }
+    body.ar-mode #particle-bg,
+    body.ar-mode .app-header {
+      display: none !important;
+    }
+    body.ar-mode .glass-container {
+      margin: 0 !important;
+      padding: 0 !important;
+      max-width: 100% !important;
+    }
+    body.ar-mode video {
+      position: fixed !important;
+      top: 0 !important;
+      left: 0 !important;
+      width: 100vw !important;
+      height: 100vh !important;
+      object-fit: cover !important;
+      z-index: -2 !important;
+    }
+    body.ar-mode a-scene {
+      position: fixed !important;
+      top: 0 !important;
+      left: 0 !important;
+      width: 100vw !important;
+      height: 100vh !important;
+      z-index: -1 !important;
+    }
+
     @media (max-width: 768px) {
       .glass-container { padding: 10px; }
       .menu-grid { grid-template-columns: 1fr; }
@@ -298,12 +331,11 @@
       initParticles();
     });
 
-    // ฟังก์ชันล้างค่า AR และคืนค่า Style ของ Body ให้กลับมาปกติ 100%
     function stopARScene() {
+      document.body.classList.remove('ar-mode');
       const container = document.getElementById('ar-scene-container');
       if (container) container.innerHTML = '';
 
-      // ลบแท็ก <video> ทั้งหมดที่ AR.js แอบสร้างไว้ออก
       document.querySelectorAll('video').forEach(video => {
         if (video.srcObject && video.srcObject.getTracks) {
           video.srcObject.getTracks().forEach(track => track.stop());
@@ -311,17 +343,16 @@
         video.remove();
       });
 
-      // ถอนรากถอนโคน Style ที่ AR.js แอบเขียนทับใส่ html และ body
       document.body.removeAttribute('style');
       document.documentElement.removeAttribute('style');
-      
-      // ดึงหน้าจอกลับมาจุดบนสุด เพื่อให้ Header แสดงผลตรงตำแหน่งเดิม
       window.scrollTo(0, 0);
     }
 
     function switchView(viewId) {
       if (viewId !== 'ar-view') {
         stopARScene();
+      } else {
+        document.body.classList.add('ar-mode');
       }
 
       document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
@@ -381,9 +412,8 @@
 
     function initARScene() {
       const container = document.getElementById('ar-scene-container');
-      // กำหนดค่า A-Frame เพื่อป้องกัน idPatt error
       container.innerHTML = `
-        <a-scene embedded arjs="sourceType: webcam; debugUIEnabled: false; detectionMode: mono_and_matrix; matrixCodeType: 3x3;">
+        <a-scene embedded arjs="sourceType: webcam; debugUIEnabled: false;">
           <a-marker preset="hiro">
             <a-box position="0 0.5 0" material="color: #00f2fe; opacity: 0.8;" animation="property: rotation; to: 0 360 0; loop: true; dur: 4000">
             </a-box>
